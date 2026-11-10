@@ -24,7 +24,7 @@ object Notify {
             enableLights(true); lightColor = Color.RED; enableVibration(true)
         })
         nm.createNotificationChannel(NotificationChannel(CH_MSG, "Zprávy", NotificationManager.IMPORTANCE_HIGH))
-        nm.deleteNotificationChannel("hlidani")
+        try { nm.deleteNotificationChannel("hlidani") } catch (_: Exception) { }
         nm.createNotificationChannel(NotificationChannel(CH_GUARD, "Hlídání hovorů", NotificationManager.IMPORTANCE_LOW).apply {
             setShowBadge(false)
         })
