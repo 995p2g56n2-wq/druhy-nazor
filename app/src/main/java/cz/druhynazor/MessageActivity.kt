@@ -63,7 +63,7 @@ class MessageActivity : Activity() {
             }
         })
 
-        if (address.isNotBlank()) {
+        if (address.isNotBlank() && !intent.getBooleanExtra(EXTRA_CHAT, false)) {
             val reply = Ui.input(this, "", "Napsat odpověď…", multi = true)
             root.addView(reply)
             root.addView(Ui.button(this, "Odeslat", Ui.CARD, Ui.ACCENT, sp = 18f) {
@@ -103,5 +103,6 @@ class MessageActivity : Activity() {
         const val EXTRA_ID = "id"
         const val EXTRA_ADDRESS = "address"
         const val EXTRA_BODY = "body"
+        const val EXTRA_CHAT = "chat"
     }
 }

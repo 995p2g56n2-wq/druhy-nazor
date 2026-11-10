@@ -11,12 +11,22 @@ android {
         applicationId = "cz.druhynazor.test"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1-zkusebni"
+        versionCode = 2
+        versionName = "0.2-zkusebni"
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("zkusebni.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
         getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
         }
     }

@@ -89,8 +89,9 @@ class MainActivity : Activity() {
         val permOk = allPermsGranted()
         val fsOk = canFullScreen()
         val guardOk = GuardService.isRunning(this)
+        val chatOk = ChatWatcher.isEnabled(this)
 
-        if (!(smsOk && callOk && permOk && fsOk && guardOk)) {
+        if (!(smsOk && callOk && permOk && fsOk && guardOk && chatOk)) {
             val setup = Ui.card(this)
             setup.addView(Ui.text(this, "Nastavení telefonu", 22f, bold = true))
             setup.addView(Ui.text(this, "Projděte body shora dolů. Hotové body mají ✅.", 16f, color = Ui.MUTED))
@@ -108,6 +109,15 @@ class MainActivity : Activity() {
                 if (!permOk) Toast.makeText(this, "Nejdřív povolte oprávnění (první bod).", Toast.LENGTH_LONG).show()
                 GuardService.start(this); root.postDelayed({ render() }, 800)
             })
+            setup.addView(step("Hlídat WhatsApp a Messenger", chatOk) {
+                Toast.makeText(this, "Najděte „Druhý názor“ a zapněte ho.", Toast.LENGTH_LONG).show()
+                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            })
+            if (!chatOk) {
+                setup.addView(Ui.text(this,
+                    "Je-li přepínač šedý („Omezené nastavení“): Nastavení → Aplikace → Druhý názor → ⋮ vpravo nahoře → Povolit omezená nastavení. Pak to zkuste znovu.",
+                    15f, color = Ui.MUTED))
+            }
             root.addView(setup)
         } else {
             root.addView(Ui.text(this, "✅ Ochrana je zapnutá", 20f, bold = true, color = Ui.OK))
