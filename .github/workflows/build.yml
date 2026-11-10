@@ -1,0 +1,39 @@
+name: Sestavit aplikaci
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Sestavit APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Pojmenovat soubor
+        run: cp app/build/outputs/apk/debug/app-debug.apk DruhyNazor.apk
+
+      - name: Zverejnit ke stazeni
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete zkusebni-verze -y --cleanup-tag || true
+          gh release create zkusebni-verze DruhyNazor.apk \
+            --title "Druhý názor – zkušební verze" \
+            --notes "Sestaveno z verze ${GITHUB_SHA::7}. Stáhněte DruhyNazor.apk přímo do telefonu a nainstalujte."
