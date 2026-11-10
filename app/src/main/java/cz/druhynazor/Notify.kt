@@ -11,7 +11,7 @@ import android.graphics.Color
 object Notify {
     const val CH_WARN = "varovani"
     const val CH_MSG = "zpravy"
-    const val CH_GUARD = "hlidani"
+    const val CH_GUARD = "hlidani_bez_cisla"
     const val CH_QUESTION = "otazka"
 
     const val ID_GUARD = 1
@@ -24,7 +24,10 @@ object Notify {
             enableLights(true); lightColor = Color.RED; enableVibration(true)
         })
         nm.createNotificationChannel(NotificationChannel(CH_MSG, "Zprávy", NotificationManager.IMPORTANCE_HIGH))
-        nm.createNotificationChannel(NotificationChannel(CH_GUARD, "Hlídání hovorů", NotificationManager.IMPORTANCE_LOW))
+        nm.deleteNotificationChannel("hlidani")
+        nm.createNotificationChannel(NotificationChannel(CH_GUARD, "Hlídání hovorů", NotificationManager.IMPORTANCE_LOW).apply {
+            setShowBadge(false)
+        })
         nm.createNotificationChannel(NotificationChannel(CH_QUESTION, "Otázka po hovoru", NotificationManager.IMPORTANCE_HIGH).apply {
             enableVibration(true)
         })
