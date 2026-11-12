@@ -25,6 +25,8 @@ class GuardService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var inUnknownCall = false
+    private var wasRinging = false
+    private var answered = false
     private var unknownNumber = ""
     private var callStart = 0L
     private var telephony: TelephonyManager? = null
@@ -94,9 +96,15 @@ class GuardService : Service() {
     private fun onState(state: Int) {
         val prefs = Prefs(this)
         when (state) {
+            TelephonyManager.CALL_STATE_RINGING -> {
+                wasRinging = true
+                answered = false
+            }
             TelephonyManager.CALL_STATE_OFFHOOK -> {
+                if (wasRinging) answered = true
                 val recentUnknown = System.currentTimeMillis() - prefs.lastUnknownTime < 120_000
-                if (!inUnknownCall && recentUnknown) {
+                // Jen přijatý příchozí hovor, ne když babička sama volá
+                if (!inUnknownCall && recentUnknown && wasRinging) {
                     inUnknownCall = true
                     unknownNumber = prefs.lastUnknownNumber
                     callStart = System.currentTimeMillis()
@@ -107,6 +115,13 @@ class GuardService : Service() {
             TelephonyManager.CALL_STATE_IDLE -> {
                 handler.removeCallbacks(longCall)
                 ScamCallActivity.close()
+                if (wasRinging && !answered && prefs.ringingScam &&
+                    System.currentTimeMillis() - prefs.lastUnknownTime < 120_000) {
+                    missedScamWarning(prefs.lastUnknownNumber)
+                }
+                wasRinging = false
+                answered = false
+                prefs.ringingScam = false
                 if (inUnknownCall) {
                     inUnknownCall = false
                     prefs.lastUnknownTime = 0L
@@ -114,6 +129,16 @@ class GuardService : Service() {
                 }
             }
         }
+    }
+
+    private fun missedScamWarning(number: String) {
+        val tap = Intent(this, ScamCallActivity::class.java)
+            .putExtra(ScamCallActivity.EXTRA_NUMBER, number)
+            .putExtra(ScamCallActivity.EXTRA_OUTGOING, ScamCallActivity.REASON_MISSED)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        Notify.show(this, Notify.ID_CALL_WARN, Notify.CH_WARN,
+            "⚠️ Volal podvodník – NEVOLEJTE ZPÁTKY",
+            "Zmeškaný hovor z čísla $number je od podvodníka. Nevolejte mu zpátky.", tap, android.graphics.Color.RED)
     }
 
     override fun onDestroy() {
