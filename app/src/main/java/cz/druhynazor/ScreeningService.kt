@@ -16,6 +16,7 @@ class ScreeningService : CallScreeningService() {
         val number = details.handle?.schemeSpecificPart ?: ""
         val prefs = Prefs(this)
         var block = false
+        var silence = false
 
         when (details.callDirection) {
             Call.Details.DIRECTION_INCOMING -> {
@@ -40,6 +41,7 @@ class ScreeningService : CallScreeningService() {
                             "⚠️ POZOR, PODVODNÍK",
                             "Volá číslo nahlášené jako podvod: $number. Neberte to.", tap, Color.RED)
                         ScamCallActivity.show(this, number)
+                        silence = true
                         Family.notify(this, "${prefs.seniorName}: volá podvodník",
                             "Volá nahlášené podvodné číslo $number.")
                     }
@@ -63,10 +65,12 @@ class ScreeningService : CallScreeningService() {
             }
         }
 
+        // Podvodníkovi se ztiší vyzvánění, místo něj zazní nahlas varování.
         // Zablokovaný hovor nezazvoní a neukáže se ani ve zmeškaných, aby nebylo komu volat zpátky
         respondToCall(details, CallResponse.Builder()
             .setDisallowCall(block)
             .setRejectCall(block)
+            .setSilenceCall(silence)
             .setSkipCallLog(block)
             .setSkipNotification(block)
             .build())

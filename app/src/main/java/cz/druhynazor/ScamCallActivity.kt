@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.media.AudioAttributes
+import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -21,6 +23,7 @@ private data class Texts(val big: String, val sub: String, val info: String, val
 class ScamCallActivity : Activity() {
 
     private var tts: TextToSpeech? = null
+    private var savedAlarmVolume = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,17 +60,34 @@ class ScamCallActivity : Activity() {
 
         setContentView(ScrollView(this).apply { setBackgroundColor(Ui.BAD); isFillViewport = true; addView(root) })
 
+        // Hlasitost budíku na maximum (po zavření se vrátí zpět), aby hlas byl slyšet
+        val audio = getSystemService(AudioManager::class.java)
+        try {
+            savedAlarmVolume = audio.getStreamVolume(AudioManager.STREAM_ALARM)
+            audio.setStreamVolume(AudioManager.STREAM_ALARM, audio.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
+        } catch (_: Exception) { savedAlarmVolume = -1 }
+
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.language = Locale("cs", "CZ")
                 tts?.setSpeechRate(0.9f)
-                tts?.speak(speech, TextToSpeech.QUEUE_FLUSH, null, "dn")
+                tts?.setAudioAttributes(AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build())
+                val params = Bundle().apply { putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_ALARM) }
+                tts?.speak(speech, TextToSpeech.QUEUE_FLUSH, params, "dn1")
+                tts?.playSilentUtterance(700, TextToSpeech.QUEUE_ADD, "pauza")
+                tts?.speak(speech, TextToSpeech.QUEUE_ADD, params, "dn2")
             }
         }
     }
 
     override fun onDestroy() {
         tts?.shutdown()
+        if (savedAlarmVolume >= 0) {
+            try { getSystemService(AudioManager::class.java).setStreamVolume(AudioManager.STREAM_ALARM, savedAlarmVolume, 0) } catch (_: Exception) { }
+        }
         if (current?.get() === this) current = null
         super.onDestroy()
     }
