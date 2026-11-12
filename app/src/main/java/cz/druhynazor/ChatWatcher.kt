@@ -81,6 +81,7 @@ class ChatWatcher : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         if (sbn.key != callKey) return
         handler.removeCallbacks(longCall)
+        ScamCallActivity.close()
         val lasted = System.currentTimeMillis() - callStart
         val number = caller
         val app = callApp
@@ -111,6 +112,7 @@ class ChatWatcher : NotificationListenerService() {
             val tap = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             Notify.show(this, Notify.ID_CALL_WARN, Notify.CH_WARN, "⚠️ POZOR, PODVODNÍK",
                 "Přes $app volá číslo nahlášené jako podvod: $title.", tap, Color.RED)
+            ScamCallActivity.show(this, title, app)
             Family.notify(this, "${prefs.seniorName}: přes $app volá podvodník", "Číslo: $title")
         }
     }

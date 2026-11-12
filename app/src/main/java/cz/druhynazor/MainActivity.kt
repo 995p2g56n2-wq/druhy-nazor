@@ -90,8 +90,9 @@ class MainActivity : Activity() {
         val fsOk = canFullScreen()
         val guardOk = GuardService.isRunning(this)
         val chatOk = ChatWatcher.isEnabled(this)
+        val overlayOk = ScamCallActivity.canShow(this)
 
-        if (!(smsOk && callOk && permOk && fsOk && guardOk && chatOk)) {
+        if (!(smsOk && callOk && permOk && fsOk && guardOk && chatOk && overlayOk)) {
             val setup = Ui.card(this)
             setup.addView(Ui.text(this, "Nastavení telefonu", 22f, bold = true))
             setup.addView(Ui.text(this, "Projděte body shora dolů. Hotové body mají ✅.", 16f, color = Ui.MUTED))
@@ -108,6 +109,10 @@ class MainActivity : Activity() {
             setup.addView(step("Spustit hlídání hovorů", guardOk) {
                 if (!permOk) Toast.makeText(this, "Nejdřív povolte oprávnění (první bod).", Toast.LENGTH_LONG).show()
                 GuardService.start(this); root.postDelayed({ render() }, 800)
+            })
+            setup.addView(step("Povolit varování přes celou obrazovku při hovoru", overlayOk) {
+                Toast.makeText(this, "Zapněte přepínač u „Druhý názor“.", Toast.LENGTH_LONG).show()
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             })
             setup.addView(step("Hlídat WhatsApp a Messenger", chatOk) {
                 Toast.makeText(this, "Najděte „Druhý názor“ a zapněte ho.", Toast.LENGTH_LONG).show()
@@ -147,12 +152,20 @@ class MainActivity : Activity() {
         val scam = Ui.input(this, prefs.testScamNumbers, "např. 777 111 222", multi = true); cfg.addView(scam)
         cfg.addView(Ui.text(this, "Po kolika minutách hovoru s neznámým číslem upozornit rodinu", 16f, color = Ui.MUTED))
         val minutes = Ui.input(this, prefs.longCallMinutes.toString(), "3", phone = true); cfg.addView(minutes)
+        val block = android.widget.CheckBox(this).apply {
+            text = "Podvodná čísla rovnou blokovat (telefon vůbec nezazvoní)"
+            textSize = 17f
+            setTextColor(Ui.INK)
+            isChecked = prefs.blockScamCalls
+        }
+        cfg.addView(block)
         cfg.addView(Ui.button(this, "Uložit nastavení", Ui.ACCENT, sp = 19f) {
             prefs.seniorName = senior.text.toString().trim().ifEmpty { "Babička" }
             prefs.familyName = famName.text.toString().trim().ifEmpty { "Tomáš" }
             prefs.familyPhone = famPhone.text.toString().trim()
             prefs.testScamNumbers = scam.text.toString().trim()
             prefs.longCallMinutes = minutes.text.toString().trim().toIntOrNull() ?: 3
+            prefs.blockScamCalls = block.isChecked
             Toast.makeText(this, "Uloženo", Toast.LENGTH_SHORT).show()
         })
 
@@ -167,6 +180,9 @@ class MainActivity : Activity() {
         cfg.addView(Ui.button(this, "Poslat rodině zkušební upozornění", Ui.CARD, Ui.ACCENT, sp = 17f) {
             Family.notify(this, "Druhý názor: zkouška", "Upozornění funguje. Takhle vám přijde zpráva, když bude seniorovi hrozit podvod.", urgent = false)
             Toast.makeText(this, "Odesláno, podívejte se do ntfy na iPhonu", Toast.LENGTH_LONG).show()
+        })
+        cfg.addView(Ui.button(this, "Ukázat varování před podvodníkem", Ui.CARD, Ui.ACCENT, sp = 17f) {
+            startActivity(Intent(this, ScamCallActivity::class.java).putExtra(ScamCallActivity.EXTRA_NUMBER, "777 000 000 (zkouška)"))
         })
         cfg.addView(Ui.button(this, "Ukázat otázku po hovoru", Ui.CARD, Ui.ACCENT, sp = 17f) {
             startActivity(Intent(this, QuestionActivity::class.java).putExtra(QuestionActivity.EXTRA_NUMBER, "777 000 000 (zkouška)"))

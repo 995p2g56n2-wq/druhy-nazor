@@ -37,6 +37,10 @@ class Prefs(context: Context) {
         get() = p.getString("test_scam", "") ?: ""
         set(v) = p.edit().putString("test_scam", v).apply()
 
+    var blockScamCalls: Boolean
+        get() = p.getBoolean("block_scam", false)
+        set(v) = p.edit().putBoolean("block_scam", v).apply()
+
     var longCallMinutes: Int
         get() = p.getInt("long_call_min", 3)
         set(v) = p.edit().putInt("long_call_min", v.coerceIn(1, 60)).apply()

@@ -106,6 +106,7 @@ class GuardService : Service() {
             }
             TelephonyManager.CALL_STATE_IDLE -> {
                 handler.removeCallbacks(longCall)
+                ScamCallActivity.close()
                 if (inUnknownCall) {
                     inUnknownCall = false
                     prefs.lastUnknownTime = 0L
