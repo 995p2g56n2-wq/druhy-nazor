@@ -1,41 +1,36 @@
 package cz.druhynazor
 
-import android.Manifest
 import android.app.Activity
-import android.app.NotificationManager
-import android.app.role.RoleManager
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
-import android.text.format.DateFormat
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Toast
 import cz.druhynazor.Ui.dp
-import java.util.Date
 
-/** Hlavní obrazovka: zprávy nahoře, pod nimi nastavení zkušební verze. */
+/**
+ * Postaráno – rodinný štít. Úvod (pro koho), katalog pomocníků s tlačítkem Instalovat
+ * a úvodní obrazovka s velkými ikonami zapnutých pomocníků.
+ */
 class MainActivity : Activity() {
 
-    private val perms: Array<String>
-        get() {
-            val list = mutableListOf(
-                Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS, Manifest.permission.SEND_SMS,
-                Manifest.permission.READ_PHONE_STATE
-            )
-            if (Build.VERSION.SDK_INT >= 33) list += Manifest.permission.POST_NOTIFICATIONS
-            return list.toTypedArray()
-        }
+    private enum class Screen { START, WHO, CATALOG, INFO, DONE, HOME }
+
+    private var screen = Screen.HOME
+    private val selected = mutableSetOf<String>()
+    private var showMore = false
+    private var infoId = Modules.DN
+    private var infoFrom = Screen.CATALOG
+    private lateinit var speaker: Speaker
+
+    /** Pro koho se nastavuje: zobrazované jméno a tvar pro „Co chcete … nainstalovat?“ */
+    private val who = listOf("Mamka" to "mamce", "Babička" to "babičce", "Taťka" to "taťkovi", "Děda" to "dědovi")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Notify.setup(this)
+        speaker = Speaker(this)
+        screen = if (Modules.onboarded(this)) Screen.HOME else Screen.START
         handleSendTo(intent)
     }
 
@@ -54,180 +49,239 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (allPermsGranted()) GuardService.start(this)
+        if (Modules.DN in Modules.installed(this) && DnSetupActivity.permsGranted(this)) GuardService.start(this)
         render()
     }
 
-    private fun allPermsGranted() = perms.all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
-
-    private fun roleHeld(role: String): Boolean {
-        val rm = getSystemService(RoleManager::class.java) ?: return false
-        return rm.isRoleAvailable(role) && rm.isRoleHeld(role)
+    override fun onDestroy() {
+        speaker.stop()
+        super.onDestroy()
     }
 
-    private fun requestRole(role: String, code: Int) {
-        val rm = getSystemService(RoleManager::class.java) ?: return
-        if (!rm.isRoleAvailable(role)) {
-            Toast.makeText(this, "Tento telefon to nepodporuje.", Toast.LENGTH_LONG).show(); return
+    private fun go(s: Screen) { screen = s; render() }
+
+    @Deprecated("Activity API")
+    override fun onBackPressed() {
+        when (screen) {
+            Screen.WHO -> go(Screen.START)
+            Screen.CATALOG -> go(if (Modules.onboarded(this)) Screen.HOME else Screen.WHO)
+            Screen.INFO -> go(infoFrom)
+            Screen.DONE -> go(Screen.HOME)
+            Screen.START, Screen.HOME -> {
+                @Suppress("DEPRECATION")
+                super.onBackPressed()
+            }
         }
-        @Suppress("DEPRECATION")
-        startActivityForResult(rm.createRequestRoleIntent(role), code)
     }
-
-    private fun canFullScreen(): Boolean =
-        if (Build.VERSION.SDK_INT >= 34) getSystemService(NotificationManager::class.java).canUseFullScreenIntent() else true
 
     private fun render() {
-        val prefs = Prefs(this)
-        val root = Ui.column(this, 16, 16).apply { setBackgroundColor(Ui.BG) }
-
-        root.addView(Ui.text(this, "Druhý názor", 32f, bold = true))
-
-        // ---- Nastavení telefonu (jen poprvé) ----
-        val smsOk = roleHeld(RoleManager.ROLE_SMS)
-        val callOk = roleHeld(RoleManager.ROLE_CALL_SCREENING)
-        val permOk = allPermsGranted()
-        val fsOk = canFullScreen()
-        val guardOk = GuardService.isRunning(this)
-        val chatOk = ChatWatcher.isEnabled(this)
-        val overlayOk = ScamCallActivity.canShow(this)
-
-        if (!(smsOk && callOk && permOk && fsOk && guardOk && chatOk && overlayOk)) {
-            val setup = Ui.card(this)
-            setup.addView(Ui.text(this, "Nastavení telefonu", 22f, bold = true))
-            setup.addView(Ui.text(this, "Projděte body shora dolů. Hotové body mají ✅.", 16f, color = Ui.MUTED))
-            setup.addView(step("Povolit oprávnění (zprávy, telefon, upozornění)", permOk) {
-                requestPermissions(perms, 10)
-            })
-            setup.addView(step("Nastavit jako aplikaci na zprávy", smsOk) { requestRole(RoleManager.ROLE_SMS, 11) })
-            setup.addView(step("Zapnout ochranu hovorů", callOk) { requestRole(RoleManager.ROLE_CALL_SCREENING, 12) })
-            setup.addView(step("Povolit otázku přes celou obrazovku", fsOk) {
-                if (Build.VERSION.SDK_INT >= 34) {
-                    startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:$packageName")))
-                }
-            })
-            setup.addView(step("Spustit hlídání hovorů", guardOk) {
-                if (!permOk) Toast.makeText(this, "Nejdřív povolte oprávnění (první bod).", Toast.LENGTH_LONG).show()
-                GuardService.start(this); root.postDelayed({ render() }, 800)
-            })
-            setup.addView(step("Povolit varování přes celou obrazovku při hovoru", overlayOk) {
-                Toast.makeText(this, "Zapněte přepínač u „Druhý názor“.", Toast.LENGTH_LONG).show()
-                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-            })
-            setup.addView(step("Hlídat WhatsApp a Messenger", chatOk) {
-                Toast.makeText(this, "Najděte „Druhý názor“ a zapněte ho.", Toast.LENGTH_LONG).show()
-                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-            })
-            if (!chatOk) {
-                setup.addView(Ui.text(this,
-                    "Je-li přepínač šedý („Omezené nastavení“): Nastavení → Aplikace → Druhý názor → ⋮ vpravo nahoře → Povolit omezená nastavení. Pak to zkuste znovu.",
-                    15f, color = Ui.MUTED))
-            }
-            root.addView(setup)
-        } else {
-            root.addView(Ui.text(this, "✅ Ochrana je zapnutá", 20f, bold = true, color = Ui.OK))
+        val root = Ui.column(this, 20, 18).apply { setBackgroundColor(Ui.BG) }
+        when (screen) {
+            Screen.START -> start(root)
+            Screen.WHO -> whoScreen(root)
+            Screen.CATALOG -> catalog(root)
+            Screen.INFO -> info(root)
+            Screen.DONE -> done(root)
+            Screen.HOME -> home(root)
         }
-
-        // ---- Zprávy ----
-        root.addView(Ui.text(this, "Zprávy", 24f, bold = true))
-        if (!permOk) {
-            root.addView(Ui.text(this, "Zprávy se ukážou po povolení oprávnění.", 17f, color = Ui.MUTED))
-        } else {
-            val list = SmsStore.latest(this)
-            if (list.isEmpty()) root.addView(Ui.text(this, "Zatím žádné zprávy.", 17f, color = Ui.MUTED))
-            for (sms in list) root.addView(messageRow(sms))
-        }
-
-        // ---- Zkušební nastavení ----
-        val cfg = Ui.card(this)
-        cfg.addView(Ui.text(this, "Nastavení pro test", 22f, bold = true))
-
-        cfg.addView(Ui.text(this, "Jak oslovit seniora v upozornění", 16f, color = Ui.MUTED))
-        val senior = Ui.input(this, prefs.seniorName, "Babička"); cfg.addView(senior)
-        cfg.addView(Ui.text(this, "Kdo z rodiny dostává upozornění", 16f, color = Ui.MUTED))
-        val famName = Ui.input(this, prefs.familyName, "Tomáš"); cfg.addView(famName)
-        cfg.addView(Ui.text(this, "Jeho telefon (pro tlačítko Zavolat)", 16f, color = Ui.MUTED))
-        val famPhone = Ui.input(this, prefs.familyPhone, "777 123 456", phone = true); cfg.addView(famPhone)
-        cfg.addView(Ui.text(this, "Čísla, která se v testu chovají jako podvodníci (oddělte čárkou)", 16f, color = Ui.MUTED))
-        val scam = Ui.input(this, prefs.testScamNumbers, "např. 777 111 222", multi = true); cfg.addView(scam)
-        cfg.addView(Ui.text(this, "Po kolika minutách hovoru s neznámým číslem upozornit rodinu", 16f, color = Ui.MUTED))
-        val minutes = Ui.input(this, prefs.longCallMinutes.toString(), "3", phone = true); cfg.addView(minutes)
-        val block = android.widget.CheckBox(this).apply {
-            text = "Podvodná čísla rovnou blokovat (telefon vůbec nezazvoní)"
-            textSize = 17f
-            setTextColor(Ui.INK)
-            isChecked = prefs.blockScamCalls
-        }
-        cfg.addView(block)
-        cfg.addView(Ui.button(this, "Uložit nastavení", Ui.ACCENT, sp = 19f) {
-            prefs.seniorName = senior.text.toString().trim().ifEmpty { "Babička" }
-            prefs.familyName = famName.text.toString().trim().ifEmpty { "Tomáš" }
-            prefs.familyPhone = famPhone.text.toString().trim()
-            prefs.testScamNumbers = scam.text.toString().trim()
-            prefs.longCallMinutes = minutes.text.toString().trim().toIntOrNull() ?: 3
-            prefs.blockScamCalls = block.isChecked
-            Toast.makeText(this, "Uloženo", Toast.LENGTH_SHORT).show()
-        })
-
-        cfg.addView(Ui.text(this, "Kanál pro upozornění rodině", 18f, bold = true))
-        cfg.addView(Ui.text(this,
-            "Na iPhone člena rodiny nainstalujte zdarma aplikaci „ntfy“ a přihlaste se k odběru tohoto kanálu:", 16f, color = Ui.MUTED))
-        cfg.addView(Ui.text(this, prefs.familyChannel, 20f, bold = true, color = Ui.ACCENT).apply { setTextIsSelectable(true) })
-        cfg.addView(Ui.button(this, "Zkopírovat kanál", Ui.CARD, Ui.ACCENT, sp = 17f) {
-            getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("kanal", prefs.familyChannel))
-            Toast.makeText(this, "Zkopírováno", Toast.LENGTH_SHORT).show()
-        })
-        cfg.addView(Ui.button(this, "Poslat rodině zkušební upozornění", Ui.CARD, Ui.ACCENT, sp = 17f) {
-            Family.notify(this, "Druhý názor: zkouška", "Upozornění funguje. Takhle vám přijde zpráva, když bude seniorovi hrozit podvod.", urgent = false)
-            Toast.makeText(this, "Odesláno, podívejte se do ntfy na iPhonu", Toast.LENGTH_LONG).show()
-        })
-        cfg.addView(Ui.button(this, "Ukázat varování před podvodníkem", Ui.CARD, Ui.ACCENT, sp = 17f) {
-            startActivity(Intent(this, ScamCallActivity::class.java).putExtra(ScamCallActivity.EXTRA_NUMBER, "777 000 000 (zkouška)"))
-        })
-        cfg.addView(Ui.button(this, "Ukázat otázku po hovoru", Ui.CARD, Ui.ACCENT, sp = 17f) {
-            startActivity(Intent(this, QuestionActivity::class.java).putExtra(QuestionActivity.EXTRA_NUMBER, "777 000 000 (zkouška)"))
-        })
-        cfg.addView(Ui.text(this,
-            "Až budete test končit: Nastavení telefonu → Aplikace → Výchozí aplikace → SMS a vraťte původní aplikaci Zprávy.",
-            15f, color = Ui.MUTED))
-        root.addView(cfg)
-
-        setContentView(ScrollView(this).apply {
-            setBackgroundColor(Ui.BG); isFillViewport = true; addView(root)
-        })
+        setContentView(ScrollView(this).apply { setBackgroundColor(Ui.BG); isFillViewport = true; addView(root) })
     }
 
-    private fun step(label: String, done: Boolean, onClick: (View) -> Unit): View =
-        if (done) Ui.text(this, "✅  $label", 18f, color = Ui.OK)
-        else Ui.button(this, "➜  $label", Ui.ACCENT, sp = 18f, onClick = onClick)
+    private fun back(root: LinearLayout) {
+        root.addView(Ui.button(this, "‹  Zpět", Ui.BG, Ui.ACCENT, sp = 18f) {
+            @Suppress("DEPRECATION") onBackPressed()
+        }.apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
+    }
 
-    private fun messageRow(sms: Sms): View {
-        val result = if (sms.incoming) ScamCheck.check(sms.body) else null
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            background = Ui.rounded(Ui.CARD, 16, this@MainActivity)
-            setPadding(0, dp(12), dp(14), dp(12))
-            setOnClickListener {
-                startActivity(Intent(this@MainActivity, MessageActivity::class.java).putExtra(MessageActivity.EXTRA_ID, sms.id))
+    private fun spacer(root: LinearLayout, dpH: Int = 24) =
+        root.addView(View(this), LinearLayout.LayoutParams(1, dp(dpH)))
+
+    // ---------- Úvod ----------
+
+    private fun start(root: LinearLayout) {
+        spacer(root, 40)
+        root.addView(Ui.text(this, "🛡️", 72f, center = true))
+        root.addView(Ui.text(this, "Postaráno", 36f, bold = true, center = true))
+        root.addView(Ui.text(this, "rodinný štít", 20f, color = Ui.ACCENT, center = true))
+        root.addView(Ui.text(this, "Jedna aplikace.\nKlidný spánek pro celou rodinu.", 24f, bold = true, center = true))
+        root.addView(Ui.text(this, "Vyberete si jen to, co opravdu potřebujete.", 18f, color = Ui.MUTED, center = true))
+        spacer(root, 40)
+        root.addView(Ui.button(this, "Začít") { go(Screen.WHO) })
+    }
+
+    private fun whoScreen(root: LinearLayout) {
+        back(root)
+        root.addView(Ui.text(this, "Pro koho aplikaci nastavujete?", 28f, bold = true))
+        root.addView(choice("Pro sebe") {
+            Modules.setForWhom(this, null); go(Screen.CATALOG)
+        })
+        root.addView(Ui.text(this, "Nebo pro někoho blízkého:", 18f, color = Ui.MUTED))
+        for ((name, _) in who) {
+            root.addView(choice(name) {
+                Modules.setForWhom(this, name)
+                Prefs(this).seniorName = name
+                go(Screen.CATALOG)
+            })
+        }
+    }
+
+    private fun choice(label: String, onClick: (View) -> Unit) =
+        Ui.button(this, "$label   ›", Ui.CARD, Ui.INK, sp = 22f, onClick = onClick)
+
+    // ---------- Katalog ----------
+
+    private fun catalog(root: LinearLayout) {
+        back(root)
+        val installed = Modules.installed(this)
+        val dative = who.firstOrNull { it.first == Modules.forWhom(this) }?.second
+        root.addView(Ui.text(this, if (dative != null) "Co chcete $dative nainstalovat?" else "Co chcete nainstalovat?", 28f, bold = true))
+        root.addView(Ui.text(this, "Vyberte jednoho nebo více pomocníků. Další můžete kdykoli přidat.", 18f, color = Ui.MUTED))
+
+        for (m in Modules.all.filter { !it.more || showMore }) root.addView(moduleCard(m, installed))
+
+        val hidden = Modules.all.count { it.more }
+        if (!showMore) {
+            root.addView(Ui.button(this, "+  Další pomocníci ($hidden)", Ui.BG, Ui.ACCENT, sp = 20f) { showMore = true; render() })
+        }
+
+        val n = selected.size
+        root.addView(Ui.button(this, if (n > 0) "Pokračovat ($n)" else "Vyberte alespoň jednoho pomocníka",
+            if (n > 0) Ui.ACCENT else Ui.MUTED) { if (n > 0) installSelected() })
+    }
+
+    private fun moduleCard(m: Module, installed: Set<String>): View {
+        val on = m.id in selected
+        val card = Ui.card(this).apply {
+            background = Ui.rounded(if (on) Ui.ACCENT_SOFT else Ui.CARD, 20, this@MainActivity, if (on) Ui.ACCENT else null)
+        }
+        card.addView(Ui.text(this, "${m.icon}  ${m.name}", 22f, bold = true))
+        card.addView(Ui.text(this, m.desc, 18f))
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        row.addView(Ui.button(this, "Více informací", Ui.CARD, Ui.ACCENT, sp = 16f) {
+            infoId = m.id; infoFrom = Screen.CATALOG; go(Screen.INFO)
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(10) })
+        val action = when {
+            m.id in installed -> Ui.text(this, "✓ Zapnuto", 18f, bold = true, color = Ui.OK, center = true)
+            !m.ready -> Ui.text(this, "Připravujeme", 17f, color = Ui.MUTED, center = true)
+            else -> Ui.button(this, if (on) "✓ Vybráno" else "Instalovat", if (on) Ui.ACCENT else Ui.CARD, if (on) android.graphics.Color.WHITE else Ui.ACCENT, sp = 18f) {
+                if (on) selected.remove(m.id) else selected.add(m.id); render()
             }
         }
-        val stripe = View(this).apply {
-            background = Ui.rounded(if (result == null) Ui.MUTED else Ui.color(result.level), 4, this@MainActivity)
+        row.addView(action, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        })
+        card.addView(row)
+        return card
+    }
+
+    private fun info(root: LinearLayout) {
+        back(root)
+        val m = Modules.byId(infoId)
+        val installed = m.id in Modules.installed(this)
+        root.addView(Ui.text(this, m.icon, 64f, center = true))
+        root.addView(Ui.text(this, m.name, 28f, bold = true, center = true))
+        root.addView(Ui.text(this, m.co, 22f))
+        val all = listOf(m.co, "Jak to funguje.") + m.jak + listOf(m.rodina, m.bezpeci)
+        root.addView(Ui.button(this, "🔊  Přečíst mi to celé", Ui.CARD, Ui.ACCENT, sp = 18f) { speaker.say(all.joinToString(" ")) })
+
+        root.addView(section("Jak to funguje", m.jak.mapIndexed { i, s -> "${i + 1}.  $s" }.joinToString("\n\n")))
+        root.addView(section("Co uvidí rodina", m.rodina))
+        root.addView(section("Je to bezpečné?", m.bezpeci + (m.pozn?.let { "\n\n$it" } ?: "")))
+
+        when {
+            installed -> Unit
+            !m.ready -> root.addView(Ui.button(this, "Připravujeme", Ui.MUTED) { })
+            m.id in selected -> root.addView(Ui.button(this, "✓ Vybráno, zpět na nabídku") { go(Screen.CATALOG) })
+            else -> root.addView(Ui.button(this, "Instalovat") { selected.add(m.id); go(Screen.CATALOG) })
         }
-        row.addView(stripe, LinearLayout.LayoutParams(dp(8), LinearLayout.LayoutParams.MATCH_PARENT).apply { marginEnd = dp(12) })
-        val col = Ui.column(this, 0, 4)
-        val label = when (result?.level) {
-            ScamCheck.Level.SCAM -> "⚠️ PODVOD · "
-            ScamCheck.Level.WARN -> "⚠️ POZOR · "
-            ScamCheck.Level.OK -> ""
-            null -> "Odesláno · "
+    }
+
+    private fun section(title: String, body: String): View {
+        val c = Ui.card(this, 8)
+        c.addView(Ui.text(this, title, 21f, bold = true))
+        c.addView(Ui.text(this, body, 18f))
+        return c
+    }
+
+    // ---------- Instalace ----------
+
+    private fun installSelected() {
+        val fresh = selected.filter { it !in Modules.installed(this) }
+        fresh.forEach { Modules.install(this, it) }
+        Modules.setOnboarded(this)
+        selected.clear()
+        if (Modules.DN in fresh && !DnSetupActivity.allDone(this)) {
+            @Suppress("DEPRECATION")
+            startActivityForResult(Intent(this, DnSetupActivity::class.java), REQ_DN_SETUP)
         }
-        col.addView(Ui.text(this, label + sms.address, 17f, bold = true,
-            color = if (result == null) Ui.MUTED else if (result.level == ScamCheck.Level.OK) Ui.INK else Ui.color(result.level)))
-        col.addView(Ui.text(this, sms.body.take(120) + if (sms.body.length > 120) "…" else "", 16f).apply { maxLines = 3 })
-        col.addView(Ui.text(this, DateFormat.format("d. M. HH:mm", Date(sms.date)), 13f, color = Ui.MUTED))
-        row.addView(col, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        return row
+        // Po návratu z průvodce (i přes Zpět) se ukáže „Hotovo“.
+        screen = Screen.DONE
+        render()
+    }
+
+    private fun done(root: LinearLayout) {
+        val n = Modules.installed(this).size
+        spacer(root, 40)
+        root.addView(Ui.text(this, "✅", 72f, center = true))
+        root.addView(Ui.text(this, "Hotovo", 36f, bold = true, center = true))
+        val name = Modules.forWhom(this)
+        val icons = if (n == 1) "jen jednu velkou ikonu" else "jen $n velké ikony"
+        val t = if (name != null) "$name teď uvidí $icons. Nic dalšího." else "Teď uvidíte $icons. Nic dalšího."
+        root.addView(Ui.text(this, t, 20f, color = Ui.MUTED, center = true))
+        spacer(root, 40)
+        root.addView(Ui.button(this, "Ukázat úvodní obrazovku") { go(Screen.HOME) })
+    }
+
+    // ---------- Úvodní obrazovka ----------
+
+    private fun home(root: LinearLayout) {
+        val installed = Modules.installed(this)
+        root.addView(Ui.text(this, "Dobrý den", 34f, bold = true))
+
+        if (Modules.DN in installed) {
+            val ok = DnSetupActivity.allDone(this)
+            val status = Ui.card(this, 4).apply {
+                background = Ui.rounded(if (ok) Ui.OK_SOFT else Ui.WARN_SOFT, 18, this@MainActivity)
+            }
+            status.addView(Ui.text(this, if (ok) "✅  Všechno v pořádku" else "⚠️  Ochrana není celá zapnutá", 20f, bold = true,
+                color = if (ok) Ui.OK else Ui.WARN))
+            status.addView(Ui.text(this, if (ok) "Hovory a SMS jsou pod dohledem." else "Ťukněte sem a dokončete nastavení.", 17f))
+            if (!ok) status.setOnClickListener { startActivity(Intent(this, DnSetupActivity::class.java)) }
+            root.addView(status)
+        }
+
+        val tiles = mutableListOf<Pair<String, () -> Unit>>()
+        for (m in Modules.all.filter { it.id in installed }) {
+            if (m.id == Modules.DN) {
+                tiles += "${m.icon}\n${m.name}" to { startActivity(Intent(this, DruhyNazorActivity::class.java)) }
+                tiles += "✉️\nZprávy" to {
+                    startActivity(Intent(this, DruhyNazorActivity::class.java).putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true))
+                }
+            } else {
+                tiles += "${m.icon}\n${m.name}" to { infoId = m.id; infoFrom = Screen.HOME; go(Screen.INFO) }
+            }
+        }
+        if (tiles.isEmpty()) {
+            root.addView(Ui.text(this, "Zatím tu není žádný pomocník.", 19f, color = Ui.MUTED))
+        }
+        tiles.chunked(2).forEach { pair ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            pair.forEachIndexed { i, (label, open) ->
+                val tile = Ui.button(this, label, Ui.CARD, Ui.INK, sp = 21f) { open() }.apply {
+                    minHeight = dp(150)
+                    background = Ui.rounded(Ui.CARD, 22, this@MainActivity, Ui.LINE)
+                }
+                row.addView(tile, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    if (i == 0 && pair.size == 2) marginEnd = dp(14)
+                })
+            }
+            root.addView(row)
+        }
+
+        spacer(root, 16)
+        root.addView(Ui.button(this, "+  Přidat pomocníka", Ui.CARD, Ui.ACCENT, sp = 19f) {
+            selected.clear(); showMore = false; go(Screen.CATALOG)
+        })
     }
 
     @Deprecated("Activity API")
@@ -237,9 +291,7 @@ class MainActivity : Activity() {
         render()
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (allPermsGranted()) GuardService.start(this)
-        render()
+    companion object {
+        private const val REQ_DN_SETUP = 20
     }
 }

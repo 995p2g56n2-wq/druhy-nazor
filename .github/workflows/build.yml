@@ -35,5 +35,5 @@ jobs:
         run: |
           gh release delete zkusebni-verze -y --cleanup-tag || true
           gh release create zkusebni-verze DruhyNazor.apk \
-            --title "Druhý názor – zkušební verze" \
+            --title "Postaráno – zkušební verze" \
             --notes "Sestaveno z verze ${GITHUB_SHA::7}. Stáhněte DruhyNazor.apk přímo do telefonu a nainstalujte."

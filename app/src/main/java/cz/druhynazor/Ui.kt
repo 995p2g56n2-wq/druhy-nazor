@@ -20,6 +20,10 @@ object Ui {
     val INK = Color.rgb(0x14, 0x30, 0x2C)
     val MUTED = Color.rgb(0x56, 0x70, 0x6B)
     val ACCENT = Color.rgb(0x0F, 0x6B, 0x5C)
+    val ACCENT_SOFT = Color.rgb(0xDC, 0xEF, 0xE9)
+    val OK_SOFT = Color.rgb(0xE1, 0xF3, 0xE6)
+    val WARN_SOFT = Color.rgb(0xFB, 0xEE, 0xD9)
+    val LINE = Color.rgb(0xCF, 0xDC, 0xD8)
     val OK = Color.rgb(0x1D, 0x7A, 0x3A)
     val WARN = Color.rgb(0xA8, 0x5D, 0x00)
     val BAD = Color.rgb(0xB3, 0x26, 0x1E)
@@ -56,7 +60,10 @@ object Ui {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
             setTextColor(color)
             if (bold) setTypeface(typeface, Typeface.BOLD)
-            if (center) gravity = Gravity.CENTER_HORIZONTAL
+            if (center) {
+                gravity = Gravity.CENTER_HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            }
             setLineSpacing(0f, 1.15f)
         }
 

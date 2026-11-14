@@ -18,7 +18,7 @@
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
-        android:label="Druhý názor"
+        android:label="Postaráno"
         android:icon="@drawable/ic_shield"
         android:roundIcon="@drawable/ic_shield"
         android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
@@ -45,6 +45,8 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".DruhyNazorActivity" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name=".DnSetupActivity" android:exported="false" />
         <activity android:name=".MessageActivity" android:exported="false" />
 
         <activity
@@ -118,7 +120,7 @@
         <service
             android:name=".ChatWatcher"
             android:exported="true"
-            android:label="Druhý názor – kontrola chatů"
+            android:label="Postaráno – kontrola chatů"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
