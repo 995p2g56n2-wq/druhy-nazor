@@ -10,46 +10,80 @@ import android.widget.ScrollView
 import android.widget.Toast
 import java.util.Locale
 
+private data class Banner(val color: Int, val head: String, val advice: String, val extra: String)
+
 /** Jedna zpráva: barevný verdikt nahoře, text bez klikacích odkazů, tlačítko na rodinu, odpověď. */
 class MessageActivity : Activity() {
 
     private var tts: TextToSpeech? = null
+    private var address = ""
+    private var body = ""
+    private var incoming = false
+    private var key = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val id = intent.getLongExtra(EXTRA_ID, -1L)
         val stored = if (id > 0) SmsStore.byId(this, id) else null
-        val address = stored?.address ?: intent.getStringExtra(EXTRA_ADDRESS) ?: ""
-        val body = stored?.body ?: intent.getStringExtra(EXTRA_BODY) ?: ""
+        address = stored?.address ?: intent.getStringExtra(EXTRA_ADDRESS) ?: ""
+        body = stored?.body ?: intent.getStringExtra(EXTRA_BODY) ?: ""
+        incoming = stored?.incoming ?: body.isNotEmpty()
+        key = intent.getStringExtra(EXTRA_KEY)
+            ?: if (id > 0) Verdicts.keyForSms(id) else Verdicts.keyForText(address, body)
         if (id > 0) SmsStore.markRead(this, id)
-        build(address, body, stored?.incoming ?: body.isNotEmpty())
+        build()
     }
 
-    private fun build(address: String, body: String, incoming: Boolean) {
+    override fun onResume() {
+        super.onResume()
+        // Mezitím mohla rodina zprávu zkontrolovat
+        if (incoming && body.isNotEmpty()) Verdicts.pollNow(this) { changed -> if (changed && !isFinishing) build() }
+    }
+
+    private fun build() {
         val prefs = Prefs(this)
         val root = Ui.column(this, 18, 16).apply { setBackgroundColor(Ui.BG) }
+        val verdict = if (incoming) Verdicts.get(this, key) else null
 
         if (body.isNotEmpty()) {
             val result = if (incoming) ScamCheck.check(body) else ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())
             if (incoming) {
-                val c = Ui.color(result.level)
-                val banner = Ui.column(this, 20, 8).apply { background = Ui.rounded(c, 22, this@MessageActivity) }
-                banner.addView(Ui.text(this, ScamCheck.headline(result.level), 34f, bold = true, color = Color.WHITE))
-                banner.addView(Ui.text(this, ScamCheck.advice(result.level), 22f, bold = true, color = Color.WHITE))
-                if (result.level != ScamCheck.Level.OK) {
-                    banner.addView(Ui.text(this, result.reason, 18f, color = Color.WHITE))
-                    banner.addView(Ui.text(this, "${prefs.familyName} už o tom ví.", 18f, color = Color.WHITE))
+                val family = prefs.familyName
+                val (c, head, advice, extra) = when {
+                    verdict == Verdicts.Verdict.OK -> Banner(Ui.OK, "V POŘÁDKU",
+                        "$family zprávu zkontroloval.", "Je to v pořádku. Odkaz můžete otevřít.")
+                    verdict == Verdicts.Verdict.SCAM -> Banner(Ui.BAD, "PODVOD",
+                        "$family potvrdil, že je to podvod.", "Na nic neklikejte, nic neplaťte a neodpovídejte.")
+                    result.level == ScamCheck.Level.WARN -> Banner(Ui.color(result.level), ScamCheck.headline(result.level),
+                        ScamCheck.advice(result.level), "${result.reason}\nČekáme, až to $family zkontroluje.")
+                    result.level == ScamCheck.Level.SCAM -> Banner(Ui.color(result.level), ScamCheck.headline(result.level),
+                        ScamCheck.advice(result.level), "${result.reason}\n$family už o tom ví.")
+                    else -> Banner(Ui.color(result.level), ScamCheck.headline(result.level), ScamCheck.advice(result.level), "")
                 }
+                val banner = Ui.column(this, 20, 8).apply { background = Ui.rounded(c, 22, this@MessageActivity) }
+                banner.addView(Ui.text(this, head, 34f, bold = true, color = Color.WHITE))
+                banner.addView(Ui.text(this, advice, 22f, bold = true, color = Color.WHITE))
+                if (extra.isNotEmpty()) banner.addView(Ui.text(this, extra, 18f, color = Color.WHITE))
                 root.addView(banner)
                 root.addView(Ui.button(this, "🔊 Přečíst nahlas", Ui.CARD, Ui.ACCENT, sp = 18f) {
-                    say("${ScamCheck.headline(result.level)}. ${ScamCheck.advice(result.level)} ${if (result.level != ScamCheck.Level.OK) result.reason else ""}")
+                    say("$head. $advice ${extra.replace("\n", " ")}")
                 })
             }
 
             val card = Ui.card(this)
             card.addView(Ui.text(this, if (incoming) "Od: $address" else "Komu: $address", 16f, color = Ui.MUTED))
-            // Žádné klikací odkazy: text se zobrazí jen jako obyčejné písmo
-            card.addView(Ui.text(this, body, 21f).apply { linksClickable = false; autoLinkMask = 0 })
+            val trusted = !incoming || verdict == Verdicts.Verdict.OK ||
+                (verdict == null && ScamCheck.check(body).level == ScamCheck.Level.OK)
+            card.addView(Ui.text(this, body, 21f).apply {
+                if (trusted) {
+                    // Zkontrolovaná nebo bezpečná zpráva: odkazy jdou otevřít
+                    autoLinkMask = android.text.util.Linkify.WEB_URLS or android.text.util.Linkify.PHONE_NUMBERS
+                    text = body
+                } else {
+                    // Podezřelá zpráva: žádné klikací odkazy, jen obyčejné písmo
+                    linksClickable = false; autoLinkMask = 0
+                }
+            })
             root.addView(card)
         } else {
             root.addView(Ui.text(this, "Nová zpráva pro: $address", 22f, bold = true))
@@ -104,5 +138,6 @@ class MessageActivity : Activity() {
         const val EXTRA_ADDRESS = "address"
         const val EXTRA_BODY = "body"
         const val EXTRA_CHAT = "chat"
+        const val EXTRA_KEY = "verdict_key"
     }
 }

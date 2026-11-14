@@ -12,7 +12,7 @@ import kotlin.concurrent.thread
  * Člen rodiny si do svého telefonu nainstaluje aplikaci „ntfy“ a přihlásí se k odběru kanálu z nastavení.
  */
 object Family {
-    fun notify(context: Context, title: String, message: String, urgent: Boolean = true) {
+    fun notify(context: Context, title: String, message: String, urgent: Boolean = true, actions: org.json.JSONArray? = null) {
         val channel = Prefs(context).familyChannel
         thread(name = "family-notify") {
             try {
@@ -22,6 +22,7 @@ object Family {
                     .put("message", message)
                     .put("priority", if (urgent) 5 else 3)
                     .put("tags", org.json.JSONArray().put(if (urgent) "rotating_light" else "warning"))
+                    .apply { if (actions != null) put("actions", actions) }
                     .toString()
                 val conn = (URL("https://ntfy.sh/").openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"

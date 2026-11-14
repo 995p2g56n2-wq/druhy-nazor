@@ -32,6 +32,7 @@ class DruhyNazorActivity : Activity() {
         super.onResume()
         if (DnSetupActivity.permsGranted(this)) GuardService.start(this)
         render()
+        Verdicts.pollNow(this) { changed -> if (changed && !isFinishing) render() }
     }
 
     private fun render() {
@@ -147,7 +148,13 @@ class DruhyNazorActivity : Activity() {
     }
 
     private fun messageRow(sms: Sms): View {
-        val result = if (sms.incoming) ScamCheck.check(sms.body) else null
+        val checked = if (sms.incoming) ScamCheck.check(sms.body) else null
+        // Rozhodnutí rodiny má přednost před automatickou kontrolou
+        val result = when (if (sms.incoming) Verdicts.get(this, Verdicts.keyForSms(sms.id)) else null) {
+            Verdicts.Verdict.OK -> ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())
+            Verdicts.Verdict.SCAM -> ScamCheck.Result(ScamCheck.Level.SCAM, "", emptyList())
+            null -> checked
+        }
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             background = Ui.rounded(Ui.CARD, 16, this@DruhyNazorActivity)

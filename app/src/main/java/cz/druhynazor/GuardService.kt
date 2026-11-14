@@ -64,6 +64,7 @@ class GuardService : Service() {
             return
         }
         listen()
+        Verdicts.startListening(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
@@ -153,6 +154,7 @@ class GuardService : Service() {
                 tm.listen(cb, PhoneStateListener.LISTEN_NONE)
             }
         }
+        Verdicts.stopListening()
         super.onDestroy()
     }
 
