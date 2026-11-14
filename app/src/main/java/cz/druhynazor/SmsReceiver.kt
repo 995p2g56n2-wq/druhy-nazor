@@ -17,6 +17,8 @@ class SmsReceiver : BroadcastReceiver() {
         val grouped = parts.groupBy { it.displayOriginatingAddress ?: "" }
         for ((address, msgs) in grouped) {
             val body = msgs.joinToString("") { it.displayMessageBody ?: "" }
+            // Odpověď rodiny „ANO 2“ / „NE 2“: zpracovat a neukazovat jako běžnou zprávu
+            if (Verdicts.handleSmsReply(context, address, body)) continue
             val sentAt = msgs.first().timestampMillis
             val id = SmsStore.saveIncoming(context, address, body, sentAt)
             handle(context, address, body, id)
@@ -25,7 +27,9 @@ class SmsReceiver : BroadcastReceiver() {
 
     private fun handle(context: Context, address: String, body: String, id: Long?) {
         val prefs = Prefs(context)
-        val result = ScamCheck.check(body)
+        // Zpráva od někoho z rodiny se nekontroluje (jinak by se rodina ptala sama sebe)
+        val result = if (prefs.familyByNumber(address) != null) ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())
+                     else ScamCheck.check(body)
         val open = Intent(context, MessageActivity::class.java).apply {
             putExtra(MessageActivity.EXTRA_ID, id ?: -1L)
             putExtra(MessageActivity.EXTRA_ADDRESS, address)
@@ -34,7 +38,6 @@ class SmsReceiver : BroadcastReceiver() {
         }
         val key = if (id != null) Verdicts.keyForSms(id) else Verdicts.keyForText(address, body)
         open.putExtra(MessageActivity.EXTRA_KEY, key)
-        val ask = "\n\nPodívejte se a ťukněte na tlačítko níže. ${prefs.seniorName} hned uvidí, jak jste rozhodli."
         val notifId = 1000 + ((id ?: System.currentTimeMillis()) % 100_000).toInt()
 
         when (result.level) {
@@ -42,15 +45,15 @@ class SmsReceiver : BroadcastReceiver() {
                 Notify.show(context, notifId, Notify.CH_WARN, "⚠️ Pozor, podvod",
                     "Od: $address. Na nic neklikejte a nic neplaťte. ${prefs.familyName} už o tom ví.", open, Color.RED)
                 Family.notify(context, "${prefs.seniorName}: podvodná SMS",
-                    "Od: $address\n${result.reason}\nOdkaz je zablokovaný.\n\nText: ${body.take(300)}$ask",
-                    actions = Verdicts.actions(context, key))
+                    "Od: $address\n${result.reason}\nOdkaz je zablokovaný.\n\nText: ${body.take(300)}",
+                    reviewKey = key)
             }
             ScamCheck.Level.WARN -> {
                 Notify.show(context, notifId, Notify.CH_WARN, "⚠️ Podezřelá zpráva",
                     "Od: $address. Zatím nic nedělejte, ptáme se: ${prefs.familyName}.", open, Color.rgb(0xA8, 0x5D, 0x00))
                 Family.notify(context, "${prefs.seniorName}: podezřelá SMS, je v pořádku?",
-                    "Od: $address\n${result.reason}\n\nText: ${body.take(300)}$ask", urgent = false,
-                    actions = Verdicts.actions(context, key))
+                    "Od: $address\n${result.reason}\n\nText: ${body.take(300)}", urgent = false,
+                    reviewKey = key)
             }
             ScamCheck.Level.OK -> {
                 Notify.show(context, notifId, Notify.CH_MSG, address, body, open)

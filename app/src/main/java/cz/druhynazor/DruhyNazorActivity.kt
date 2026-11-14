@@ -71,16 +71,15 @@ class DruhyNazorActivity : Activity() {
 
         if (onlyMessages) { show(root); return }
 
+        // ---- Rodina ----
+        root.addView(FamilyUi.card(this) { render() })
+
         // ---- Zkušební nastavení ----
         val cfg = Ui.card(this)
         cfg.addView(Ui.text(this, "Nastavení pro test", 22f, bold = true))
 
         cfg.addView(Ui.text(this, "Jak oslovit seniora v upozornění", 16f, color = Ui.MUTED))
         val senior = Ui.input(this, prefs.seniorName, "Babička"); cfg.addView(senior)
-        cfg.addView(Ui.text(this, "Kdo z rodiny dostává upozornění", 16f, color = Ui.MUTED))
-        val famName = Ui.input(this, prefs.familyName, "Tomáš"); cfg.addView(famName)
-        cfg.addView(Ui.text(this, "Jeho telefon (pro tlačítko Zavolat)", 16f, color = Ui.MUTED))
-        val famPhone = Ui.input(this, prefs.familyPhone, "777 123 456", phone = true); cfg.addView(famPhone)
         cfg.addView(Ui.text(this, "Čísla, která se v testu chovají jako podvodníci (oddělte čárkou)", 16f, color = Ui.MUTED))
         val scam = Ui.input(this, prefs.testScamNumbers, "např. 777 111 222", multi = true); cfg.addView(scam)
         cfg.addView(Ui.text(this, "Po kolika minutách hovoru s neznámým číslem upozornit rodinu", 16f, color = Ui.MUTED))
@@ -94,25 +93,31 @@ class DruhyNazorActivity : Activity() {
         cfg.addView(block)
         cfg.addView(Ui.button(this, "Uložit nastavení", Ui.ACCENT, sp = 19f) {
             prefs.seniorName = senior.text.toString().trim().ifEmpty { "Babička" }
-            prefs.familyName = famName.text.toString().trim().ifEmpty { "Tomáš" }
-            prefs.familyPhone = famPhone.text.toString().trim()
             prefs.testScamNumbers = scam.text.toString().trim()
             prefs.longCallMinutes = minutes.text.toString().trim().toIntOrNull() ?: 3
             prefs.blockScamCalls = block.isChecked
             Toast.makeText(this, "Uloženo", Toast.LENGTH_SHORT).show()
         })
 
-        cfg.addView(Ui.text(this, "Kanál pro upozornění rodině", 18f, bold = true))
+        cfg.addView(Ui.text(this, "Zkušební upozornění přes ntfy", 18f, bold = true))
+        val ntfy = android.widget.CheckBox(this).apply {
+            text = "Posílat upozornění i do aplikace ntfy (s tlačítky)"
+            textSize = 17f
+            setTextColor(Ui.INK)
+            isChecked = prefs.ntfyEnabled
+            setOnCheckedChangeListener { _, on -> prefs.ntfyEnabled = on }
+        }
+        cfg.addView(ntfy)
         cfg.addView(Ui.text(this,
-            "Na iPhone člena rodiny nainstalujte zdarma aplikaci „ntfy“ a přihlaste se k odběru tohoto kanálu:", 16f, color = Ui.MUTED))
+            "V aplikaci „ntfy“ se přihlaste k odběru tohoto kanálu:", 16f, color = Ui.MUTED))
         cfg.addView(Ui.text(this, prefs.familyChannel, 20f, bold = true, color = Ui.ACCENT).apply { setTextIsSelectable(true) })
         cfg.addView(Ui.button(this, "Zkopírovat kanál", Ui.CARD, Ui.ACCENT, sp = 17f) {
             getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("kanal", prefs.familyChannel))
             Toast.makeText(this, "Zkopírováno", Toast.LENGTH_SHORT).show()
         })
-        cfg.addView(Ui.button(this, "Poslat rodině zkušební upozornění", Ui.CARD, Ui.ACCENT, sp = 17f) {
-            Family.notify(this, "Druhý názor: zkouška", "Upozornění funguje. Takhle vám přijde zpráva, když bude seniorovi hrozit podvod.", urgent = false)
-            Toast.makeText(this, "Odesláno, podívejte se do ntfy na iPhonu", Toast.LENGTH_LONG).show()
+        cfg.addView(Ui.button(this, "Poslat zkušební upozornění do ntfy", Ui.CARD, Ui.ACCENT, sp = 17f) {
+            Family.ntfy(this, "Postaráno: zkouška", "Upozornění funguje. Takhle vám přijde zpráva, když bude seniorovi hrozit podvod.", urgent = false)
+            Toast.makeText(this, "Odesláno, podívejte se do ntfy", Toast.LENGTH_LONG).show()
         })
         cfg.addView(Ui.button(this, "Ukázat varování před podvodníkem", Ui.CARD, Ui.ACCENT, sp = 17f) {
             startActivity(Intent(this, ScamCallActivity::class.java).putExtra(ScamCallActivity.EXTRA_NUMBER, "777 000 000 (zkouška)"))
@@ -128,8 +133,17 @@ class DruhyNazorActivity : Activity() {
             Toast.makeText(this, "Odebráno. Vrátit ho jde přes „Přidat pomocníka“.", Toast.LENGTH_LONG).show()
             backHome()
         })
+        val version = try { packageManager.getPackageInfo(packageName, 0).versionName } catch (e: Exception) { "?" }
+        cfg.addView(Ui.text(this, "Verze aplikace: $version", 15f, color = Ui.MUTED))
         root.addView(cfg)
         show(root)
+    }
+
+    @Deprecated("Activity API")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (FamilyUi.onResult(this, requestCode, resultCode, data)) render()
     }
 
     /** Zpět na úvodní obrazovku, i když se Druhý názor otevřel z upozornění. */
@@ -148,7 +162,9 @@ class DruhyNazorActivity : Activity() {
     }
 
     private fun messageRow(sms: Sms): View {
-        val checked = if (sms.incoming) ScamCheck.check(sms.body) else null
+        val fromFamily = Prefs(this).familyByNumber(sms.address) != null
+        val checked = if (!sms.incoming) null
+            else if (fromFamily) ScamCheck.Result(ScamCheck.Level.OK, "", emptyList()) else ScamCheck.check(sms.body)
         // Rozhodnutí rodiny má přednost před automatickou kontrolou
         val result = when (if (sms.incoming) Verdicts.get(this, Verdicts.keyForSms(sms.id)) else null) {
             Verdicts.Verdict.OK -> ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())

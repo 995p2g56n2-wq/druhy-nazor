@@ -43,17 +43,18 @@ class MessageActivity : Activity() {
     private fun build() {
         val prefs = Prefs(this)
         val root = Ui.column(this, 18, 16).apply { setBackgroundColor(Ui.BG) }
-        val verdict = if (incoming) Verdicts.get(this, key) else null
+        val fromFamily = incoming && prefs.familyByNumber(address) != null
+        val verdict = if (incoming && !fromFamily) Verdicts.get(this, key) else null
 
         if (body.isNotEmpty()) {
-            val result = if (incoming) ScamCheck.check(body) else ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())
+            val result = if (incoming && !fromFamily) ScamCheck.check(body) else ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())
             if (incoming) {
-                val family = prefs.familyName
+                val family = Verdicts.decidedBy(this, key) ?: prefs.familyName
                 val (c, head, advice, extra) = when {
                     verdict == Verdicts.Verdict.OK -> Banner(Ui.OK, "V POŘÁDKU",
-                        "$family zprávu zkontroloval.", "Je to v pořádku. Odkaz můžete otevřít.")
+                        "$family říká: je to v pořádku.", "Odkaz můžete otevřít.")
                     verdict == Verdicts.Verdict.SCAM -> Banner(Ui.BAD, "PODVOD",
-                        "$family potvrdil, že je to podvod.", "Na nic neklikejte, nic neplaťte a neodpovídejte.")
+                        "$family říká: je to podvod.", "Na nic neklikejte, nic neplaťte a neodpovídejte.")
                     result.level == ScamCheck.Level.WARN -> Banner(Ui.color(result.level), ScamCheck.headline(result.level),
                         ScamCheck.advice(result.level), "${result.reason}\nČekáme, až to $family zkontroluje.")
                     result.level == ScamCheck.Level.SCAM -> Banner(Ui.color(result.level), ScamCheck.headline(result.level),
@@ -73,7 +74,7 @@ class MessageActivity : Activity() {
             val card = Ui.card(this)
             card.addView(Ui.text(this, if (incoming) "Od: $address" else "Komu: $address", 16f, color = Ui.MUTED))
             val trusted = !incoming || verdict == Verdicts.Verdict.OK ||
-                (verdict == null && ScamCheck.check(body).level == ScamCheck.Level.OK)
+                (verdict == null && result.level == ScamCheck.Level.OK)
             card.addView(Ui.text(this, body, 21f).apply {
                 if (trusted) {
                     // Zkontrolovaná nebo bezpečná zpráva: odkazy jdou otevřít

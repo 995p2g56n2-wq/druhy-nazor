@@ -47,30 +47,84 @@ object Verdicts {
         return JSONArray().put(btn("✅ Je to v pořádku", "ok")).put(btn("⛔ Je to podvod", "scam"))
     }
 
-    /** Zpracuje jednu odpověď z kanálu. Vrací true, pokud se něco změnilo. */
+    /** Zpracuje jednu odpověď z kanálu ntfy. Vrací true, pokud se něco změnilo. */
     private fun apply(ctx: Context, message: String): Boolean {
         val parts = message.trim().split('|')
         if (parts.size != 3) return false
         val (verdict, key, token) = parts
-        val p = prefs(ctx)
         if (verdict != "ok" && verdict != "scam") return false
-        if (p.getString("t_$key", null) != token) return false
-        if (p.getString("v_$key", null) == verdict) return false
-        p.edit().putString("v_$key", verdict).apply()
+        if (prefs(ctx).getString("t_$key", null) != token) return false
+        return record(ctx, key, if (verdict == "ok") Verdict.OK else Verdict.SCAM, null, null)
+    }
+
+    /** Kdo zprávu posoudil (jméno z rodiny), nebo null. */
+    fun decidedBy(ctx: Context, key: String): String? = prefs(ctx).getString("by_$key", null)
+
+    /**
+     * Uloží rozhodnutí rodiny, dá vědět seniorovi a potvrdí to rodině.
+     * byNumber = odpověď přišla SMS z tohoto čísla.
+     */
+    fun record(ctx: Context, key: String, verdict: Verdict, byName: String?, byNumber: String?): Boolean {
+        val p = prefs(ctx)
+        val v = if (verdict == Verdict.OK) "ok" else "scam"
+        if (p.getString("v_$key", null) == v) return false
+        p.edit().putString("v_$key", v).apply { if (byName != null) putString("by_$key", byName) else remove("by_$key") }.apply()
 
         val prefsMain = Prefs(ctx)
-        val ok = verdict == "ok"
-        val family = prefsMain.familyName
+        val ok = verdict == Verdict.OK
+        val who = byName ?: prefsMain.familyName
         val tap = Intent(ctx, DruhyNazorActivity::class.java)
             .putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         Notify.show(ctx, 7000 + (key.hashCode() and 0xFFF), if (ok) Notify.CH_MSG else Notify.CH_WARN,
-            if (ok) "✅ $family to zkontroloval" else "⛔ $family potvrdil podvod",
+            if (ok) "✅ $who: zpráva je v pořádku" else "⛔ $who: je to podvod",
             if (ok) "Zpráva je v pořádku, můžete ji otevřít." else "Na nic neklikejte, nic neplaťte a na zprávu neodpovídejte.",
             tap, if (ok) Ui.OK else Color.RED)
-        Family.notify(ctx, "Hotovo",
-            if (ok) "${prefsMain.seniorName} uvidí, že je zpráva v pořádku, a odkaz půjde otevřít."
-            else "${prefsMain.seniorName} uvidí, že je to potvrzený podvod.", urgent = false)
+
+        val senior = prefsMain.seniorName
+        val result = if (ok) "$senior uvidí, že je zpráva v pořádku, a odkaz půjde otevřít."
+                     else "$senior uvidí, že je to potvrzený podvod."
+        if (byNumber != null) {
+            Family.sendSms(ctx, byNumber, "Postaráno: Díky. $result")
+            Family.sms(ctx, "Postaráno: Vyřízeno. $who napsal(a): ${if (ok) "zpráva je v pořádku" else "je to podvod"}. Nemusíte nic dělat.", except = byNumber)
+        } else if (prefsMain.ntfyEnabled) {
+            Family.ntfy(ctx, "Hotovo", result, urgent = false)
+        }
+        return true
+    }
+
+    // ---------- Odpovědi rodiny přes SMS ----------
+
+    /** Věta na konec SMS pro rodinu. Každá čekající zpráva má krátké číslo 1–9. */
+    fun smsQuestion(ctx: Context, key: String): String {
+        val p = prefs(ctx)
+        val n = (p.getInt("next_n", 0) % 9) + 1
+        p.edit().putInt("next_n", n).putString("p_$n", key).putLong("pt_$n", System.currentTimeMillis()).apply()
+        return "Je to v pořádku? Odpovězte ANO $n, nebo NE $n."
+    }
+
+    private val replyRegex = Regex("^\\s*(ano|ne)\\s*([1-9])?\\s*[.!]*\\s*$", RegexOption.IGNORE_CASE)
+
+    /**
+     * SMS od člena rodiny ve tvaru „ANO 2“ / „NE“. Vrací true, když byla zpracovaná jako odpověď
+     * (pak se neukazuje jako běžná zpráva).
+     */
+    fun handleSmsReply(ctx: Context, from: String, body: String): Boolean {
+        val member = Prefs(ctx).familyByNumber(from) ?: return false
+        val m = replyRegex.find(body) ?: return false
+        val verdict = if (m.groupValues[1].equals("ano", ignoreCase = true)) Verdict.OK else Verdict.SCAM
+        val p = prefs(ctx)
+        val week = 7L * 24 * 3600 * 1000
+        val now = System.currentTimeMillis()
+        val n = m.groupValues[2].toIntOrNull()
+            // Bez čísla: poslední otázka
+            ?: (1..9).filter { now - p.getLong("pt_$it", 0L) < week }.maxByOrNull { p.getLong("pt_$it", 0L) }
+            ?: return false
+        if (now - p.getLong("pt_$n", 0L) > week) return false
+        val key = p.getString("p_$n", null) ?: return false
+        if (!record(ctx, key, verdict, member.name, from)) {
+            Family.sendSms(ctx, from, "Postaráno: Tahle zpráva už je vyřízená. Nemusíte nic dělat.")
+        }
         return true
     }
 

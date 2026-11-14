@@ -4,8 +4,6 @@ import android.Manifest
 import android.app.Activity
 import android.app.NotificationManager
 import android.app.role.RoleManager
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -182,41 +180,18 @@ class DnSetupActivity : Activity() {
 
     private fun family(root: LinearLayout) {
         familyShown = true
-        val prefs = Prefs(this)
         root.addView(bigIcon("👨‍👩‍👧"))
         root.addView(Ui.text(this, "Propojit s rodinou", 28f, bold = true, center = true))
-        val t = "Když se stane něco důležitého, aplikace dá vědět i vaší rodině."
+        val t = "Vyberte, komu z rodiny má aplikace napsat, když přijde něco podezřelého. Rodina nemusí nic instalovat."
         root.addView(sayBox(t))
         speakOnce(t)
-
-        val card = Ui.card(this)
-        card.addView(Ui.text(this, "Kdo z rodiny dostává upozornění", 17f, color = Ui.MUTED))
-        val name = Ui.input(this, prefs.familyName, "Tomáš"); card.addView(name)
-        card.addView(Ui.text(this, "Jeho telefon (pro tlačítko Zavolat)", 17f, color = Ui.MUTED))
-        val phone = Ui.input(this, prefs.familyPhone, "777 123 456", phone = true); card.addView(phone)
-        card.addView(Ui.text(this,
-            "Na telefonu člena rodiny nainstalujte zdarma aplikaci „ntfy“ a přihlaste se k odběru tohoto kanálu:", 17f, color = Ui.MUTED))
-        card.addView(Ui.text(this, prefs.familyChannel, 20f, bold = true, color = Ui.ACCENT).apply { setTextIsSelectable(true) })
-        card.addView(Ui.button(this, "Zkopírovat kanál", Ui.CARD, Ui.ACCENT, sp = 17f) {
-            getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("kanal", prefs.familyChannel))
-            Toast.makeText(this, "Zkopírováno", Toast.LENGTH_SHORT).show()
-        })
-        card.addView(Ui.button(this, "Poslat rodině zkušební upozornění", Ui.CARD, Ui.ACCENT, sp = 17f) {
-            save(prefs, name.text.toString(), phone.text.toString())
-            Family.notify(this, "Postaráno: zkouška", "Upozornění funguje. Takhle vám přijde zpráva, když bude hrozit podvod.", urgent = false)
-            Toast.makeText(this, "Odesláno, podívejte se do ntfy", Toast.LENGTH_LONG).show()
-        })
-        root.addView(card)
-
+        root.addView(FamilyUi.card(this) { render() })
         root.addView(Ui.button(this, "Hotovo") {
-            save(prefs, name.text.toString(), phone.text.toString())
-            setResult(RESULT_OK); finish()
+            if (Prefs(this).familyContacts.isEmpty()) {
+                Toast.makeText(this, "Přidejte aspoň jednoho člověka z rodiny.", Toast.LENGTH_LONG).show()
+            } else { setResult(RESULT_OK); finish() }
         })
-    }
-
-    private fun save(prefs: Prefs, name: String, phone: String) {
-        prefs.familyName = name.trim().ifEmpty { "Tomáš" }
-        prefs.familyPhone = phone.trim()
+        root.addView(Ui.button(this, "Přeskočit, nastavím později", Ui.BG, Ui.MUTED, sp = 17f) { setResult(RESULT_OK); finish() })
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -229,6 +204,7 @@ class DnSetupActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
+        if (FamilyUi.onResult(this, requestCode, resultCode, data)) { render(); return }
         evaluate(); render()
     }
 

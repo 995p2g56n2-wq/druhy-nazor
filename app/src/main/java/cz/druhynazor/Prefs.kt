@@ -4,18 +4,55 @@ import android.content.Context
 import android.content.SharedPreferences
 import kotlin.random.Random
 
+data class FamilyContact(val name: String, val phone: String)
+
 /** Nastavení zkušební verze. */
 class Prefs(context: Context) {
     private val p: SharedPreferences =
         context.applicationContext.getSharedPreferences("druhy_nazor", Context.MODE_PRIVATE)
 
     var familyName: String
-        get() = p.getString("family_name", "Tomáš") ?: "Tomáš"
+        get() = p.getString("family_name", "Rodina") ?: "Rodina"
         set(v) = p.edit().putString("family_name", v).apply()
 
     var familyPhone: String
         get() = p.getString("family_phone", "") ?: ""
         set(v) = p.edit().putString("family_phone", v).apply()
+
+    /** Kdo z rodiny dostává SMS a může odpovědět ANO / NE. */
+    var familyContacts: List<FamilyContact>
+        get() {
+            val raw = p.getString("family_contacts", null)
+            if (raw == null) {
+                // Starší verze měla jen jedno jméno a číslo
+                val phone = familyPhone
+                return if (phone.isNotBlank()) listOf(FamilyContact(familyName, phone)) else emptyList()
+            }
+            return try {
+                val arr = org.json.JSONArray(raw)
+                (0 until arr.length()).map { val o = arr.getJSONObject(it); FamilyContact(o.getString("n"), o.getString("p")) }
+            } catch (e: Exception) { emptyList() }
+        }
+        set(v) {
+            val arr = org.json.JSONArray()
+            v.forEach { arr.put(org.json.JSONObject().put("n", it.name).put("p", it.phone)) }
+            p.edit().putString("family_contacts", arr.toString()).apply()
+            // Jméno do textů („Standa už o tom ví“) a číslo pro tlačítko Zavolat
+            familyName = when (v.size) { 0 -> "Rodina"; 1 -> v[0].name; else -> "Rodina" }
+            familyPhone = v.firstOrNull()?.phone ?: ""
+        }
+
+    /** Kdo z rodiny má toto číslo, nebo null. */
+    fun familyByNumber(number: String?): FamilyContact? {
+        val n = normalize(number ?: return null)
+        if (n.isEmpty()) return null
+        return familyContacts.firstOrNull { normalize(it.phone) == n }
+    }
+
+    /** Posílat upozornění i do aplikace ntfy (zkušební cesta). */
+    var ntfyEnabled: Boolean
+        get() = p.getBoolean("ntfy_enabled", true)
+        set(v) = p.edit().putBoolean("ntfy_enabled", v).apply()
 
     var seniorName: String
         get() = p.getString("senior_name", "Babička") ?: "Babička"

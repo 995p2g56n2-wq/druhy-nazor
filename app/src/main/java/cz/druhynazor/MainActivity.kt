@@ -51,6 +51,8 @@ class MainActivity : Activity() {
         super.onResume()
         if (Modules.DN in Modules.installed(this) && DnSetupActivity.permsGranted(this)) GuardService.start(this)
         render()
+        // Hlídání po spuštění chvíli nabíhá (třeba po aktualizaci), stav pak zkontrolovat znovu
+        window.decorView.postDelayed({ if (screen == Screen.HOME && !isFinishing) render() }, 1500)
     }
 
     override fun onDestroy() {
@@ -267,8 +269,11 @@ class MainActivity : Activity() {
         tiles.chunked(2).forEach { pair ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             pair.forEachIndexed { i, (label, open) ->
-                val tile = Ui.button(this, label, Ui.CARD, Ui.INK, sp = 21f) { open() }.apply {
+                val tile = Ui.button(this, label, Ui.CARD, Ui.INK, sp = 20f) { open() }.apply {
                     minHeight = dp(150)
+                    maxLines = 4
+                    ellipsize = null
+                    setPadding(dp(6), dp(14), dp(6), dp(14))
                     background = Ui.rounded(Ui.CARD, 22, this@MainActivity, Ui.LINE)
                 }
                 row.addView(tile, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
