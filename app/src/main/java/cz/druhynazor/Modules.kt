@@ -134,7 +134,7 @@ class Speaker(private val ctx: Context) {
 
     fun say(text: String) {
         tts?.shutdown()
-        tts = TextToSpeech(ctx) { status ->
+        tts = Voice.tts(ctx) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.language = Locale("cs", "CZ")
                 tts?.setSpeechRate(0.9f)

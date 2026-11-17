@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Záloha nastavení (Android 11 a starší): rodina, pomocníci, hlas. -->
+<full-backup-content>
+    <include domain="sharedpref" path="." />
+        <exclude domain="sharedpref" path="zarizeni.xml" />
+</full-backup-content>

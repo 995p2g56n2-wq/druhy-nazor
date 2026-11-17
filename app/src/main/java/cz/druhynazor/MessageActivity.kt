@@ -120,7 +120,7 @@ class MessageActivity : Activity() {
 
     private fun say(text: String) {
         tts?.shutdown()
-        tts = TextToSpeech(this) { status ->
+        tts = Voice.tts(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.language = Locale("cs", "CZ")
                 tts?.setSpeechRate(0.9f)

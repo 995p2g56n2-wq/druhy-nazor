@@ -67,7 +67,7 @@ class ScamCallActivity : Activity() {
             audio.setStreamVolume(AudioManager.STREAM_ALARM, audio.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
         } catch (_: Exception) { savedAlarmVolume = -1 }
 
-        tts = TextToSpeech(this) { status ->
+        tts = Voice.tts(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts?.language = Locale("cs", "CZ")
                 tts?.setSpeechRate(0.9f)

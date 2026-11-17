@@ -22,7 +22,9 @@
         android:icon="@drawable/ic_shield"
         android:roundIcon="@drawable/ic_shield"
         android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar"
-        android:allowBackup="false">
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/zaloha"
+        android:dataExtractionRules="@xml/zaloha_nova">
 
         <activity
             android:name=".MainActivity"

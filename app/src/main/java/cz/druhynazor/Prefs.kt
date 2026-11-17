@@ -10,6 +10,9 @@ data class FamilyContact(val name: String, val phone: String)
 class Prefs(context: Context) {
     private val p: SharedPreferences =
         context.applicationContext.getSharedPreferences("druhy_nazor", Context.MODE_PRIVATE)
+    /** Věci, které patří jen k tomuto telefonu. Nezálohují se, nový telefon je musí projít znovu. */
+    private val d: SharedPreferences =
+        context.applicationContext.getSharedPreferences("zarizeni", Context.MODE_PRIVATE)
 
     var familyName: String
         get() = p.getString("family_name", "Rodina") ?: "Rodina"
@@ -53,6 +56,21 @@ class Prefs(context: Context) {
     var ntfyEnabled: Boolean
         get() = p.getBoolean("ntfy_enabled", true)
         set(v) = p.edit().putBoolean("ntfy_enabled", v).apply()
+
+    /** Telefon umí mluvit česky (hlasem Google). */
+    var voiceOk: Boolean
+        get() = d.getBoolean("voice_ok", false)
+        set(v) = d.edit().putBoolean("voice_ok", v).apply()
+
+    /** Původní Zprávy jsou schované z plochy, na ploše je naše obálka. */
+    var uklidDone: Boolean
+        get() = d.getBoolean("uklid_done", false)
+        set(v) = d.edit().putBoolean("uklid_done", v).apply()
+
+    /** Rodině už odešla zkušební zpráva na konci nastavení. */
+    var testSent: Boolean
+        get() = p.getBoolean("test_sent", false)
+        set(v) = p.edit().putBoolean("test_sent", v).apply()
 
     var seniorName: String
         get() = p.getString("senior_name", "Babička") ?: "Babička"

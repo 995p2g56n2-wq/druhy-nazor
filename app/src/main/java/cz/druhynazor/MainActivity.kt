@@ -212,26 +212,61 @@ class MainActivity : Activity() {
         fresh.forEach { Modules.install(this, it) }
         Modules.setOnboarded(this)
         selected.clear()
+        // Po návratu z průvodce (i přes Zpět) se ukáže kontrola na konec.
+        screen = Screen.DONE
         if (Modules.DN in fresh && !DnSetupActivity.allDone(this)) {
             @Suppress("DEPRECATION")
             startActivityForResult(Intent(this, DnSetupActivity::class.java), REQ_DN_SETUP)
-        }
-        // Po návratu z průvodce (i přes Zpět) se ukáže „Hotovo“.
-        screen = Screen.DONE
-        render()
+        } else render()
     }
 
+    /**
+     * Kontrola na konec. Zelená = všechno zapnuté, rodina dostala zkušební zprávu.
+     * Oranžová = něco chybí, jedním ťuknutím se dokončí.
+     */
     private fun done(root: LinearLayout) {
-        val n = Modules.installed(this).size
+        val dn = Modules.DN in Modules.installed(this)
+        val ok = !dn || DnSetupActivity.allDone(this)
+        val prefs = Prefs(this)
+        val family = prefs.familyContacts
+
+        // Zkušební zpráva rodině, jen jednou a jen když je všechno zapnuté
+        if (dn && ok && family.isNotEmpty() && !prefs.testSent) {
+            prefs.testSent = true
+            Family.sms(this, "Postaráno: Zkouška. Všechno je nastavené. Takhle vám přijde zpráva, " +
+                "když ${prefs.seniorName} dostane něco podezřelého. Teď nemusíte odpovídat.")
+        }
+
+        root.setBackgroundColor(if (ok) Ui.OK_SOFT else Ui.WARN_SOFT)
         spacer(root, 40)
-        root.addView(Ui.text(this, "✅", 72f, center = true))
-        root.addView(Ui.text(this, "Hotovo", 36f, bold = true, center = true))
-        val name = Modules.forWhom(this)
-        val icons = if (n == 1) "jen jednu velkou ikonu" else "jen $n velké ikony"
-        val t = if (name != null) "$name teď uvidí $icons. Nic dalšího." else "Teď uvidíte $icons. Nic dalšího."
-        root.addView(Ui.text(this, t, 20f, color = Ui.MUTED, center = true))
+        root.addView(Ui.text(this, if (ok) "✅" else "⚠️", 72f, center = true))
+        val lines = if (ok) {
+            val who = when (family.size) { 0 -> null; 1 -> family[0].name; else -> "Rodina" }
+            listOfNotNull("Všechno je hotové.", "Jste chránění.",
+                who?.let { "$it už má zkušební zprávu." })
+        } else {
+            listOf("Skoro hotovo.", "Ochrana ještě není celá zapnutá.", "Ťukněte na Dokončit.")
+        }
+        root.addView(Ui.text(this, lines[0], 34f, bold = true, center = true, color = if (ok) Ui.OK else Ui.WARN))
+        lines.drop(1).forEach { root.addView(Ui.text(this, it, 22f, center = true)) }
+        speakDone(lines.joinToString(" "))
         spacer(root, 40)
-        root.addView(Ui.button(this, "Ukázat úvodní obrazovku") { go(Screen.HOME) })
+        if (ok) {
+            root.addView(Ui.button(this, "Hotovo", Ui.OK) { go(Screen.HOME) })
+        } else {
+            root.addView(Ui.button(this, "Dokončit", Ui.WARN) {
+                @Suppress("DEPRECATION")
+                startActivityForResult(Intent(this, DnSetupActivity::class.java), REQ_DN_SETUP)
+            })
+            root.addView(Ui.button(this, "Později", Ui.CARD, Ui.ACCENT, sp = 18f) { go(Screen.HOME) })
+        }
+    }
+
+    private var spokenDone: String? = null
+    private fun speakDone(text: String) {
+        if (spokenDone == text || !Prefs(this).voiceOk) return
+        spokenDone = text
+        speaker.say(text)
     }
 
     // ---------- Úvodní obrazovka ----------

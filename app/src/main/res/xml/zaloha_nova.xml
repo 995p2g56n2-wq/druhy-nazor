@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Záloha nastavení (Android 12 a novější): na Google Disk i při přenosu do nového telefonu. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="." />
+        <exclude domain="sharedpref" path="zarizeni.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="." />
+        <exclude domain="sharedpref" path="zarizeni.xml" />
+    </device-transfer>
+</data-extraction-rules>
