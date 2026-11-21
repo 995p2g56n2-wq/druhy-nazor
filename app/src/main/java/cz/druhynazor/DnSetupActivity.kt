@@ -97,6 +97,15 @@ class DnSetupActivity : Activity() {
         }
     }
 
+    /** Aplikaci zakrylo okénko telefonu (třeba „Přidat na plochu“). */
+    private var paused = false
+
+    override fun onPause() {
+        super.onPause()
+        paused = true
+        speaker.stop()
+    }
+
     override fun onResume() {
         super.onResume()
         if (permsGranted(this)) GuardService.start(this)
@@ -222,7 +231,19 @@ class DnSetupActivity : Activity() {
             "voice" -> Voice.fix(this)
             // Jen obálka na plochu. Schování původních Zpráv je mimo aplikaci, to udělá rodina
             // později podle návodu v Pro rodinu (senior by se z plochy zpátky nevrátil).
-            "uklid" -> { awaiting = false; pinMessages(); Prefs(this).envelopePinned = true; next() }
+            "uklid" -> {
+                Prefs(this).envelopePinned = true
+                paused = false
+                if (!pinMessages()) { awaiting = false; next() }
+                else {
+                    // Okénko „Přidat na plochu“: počkat, až ho člověk zavře (Přidat i Zrušit).
+                    // Pak se zavolá onResume a teprve tehdy se mluví další krok.
+                    // Kdyby se okénko vůbec neukázalo, po chvilce jít dál samo.
+                    window.decorView.postDelayed({
+                        if (awaiting && !paused && !isFinishing) { awaiting = false; next() }
+                    }, 2500)
+                }
+            }
             "perms" -> requestPermissions(perms(), 10)
             "sms" -> requestRole(RoleManager.ROLE_SMS)
             "calls" -> requestRole(RoleManager.ROLE_CALL_SCREENING)
