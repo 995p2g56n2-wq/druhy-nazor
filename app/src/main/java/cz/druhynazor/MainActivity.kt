@@ -179,7 +179,7 @@ class MainActivity : Activity() {
         spacer(root, 40)
         root.addView(Ui.text(this, if (ok) "✅" else "⚠️", 80f, center = true))
         val lines = if (ok) {
-            listOfNotNull("Hotovo.", "Jste chránění.",
+            listOfNotNull("Hotovo, jste chránění.",
                 if (prefs.testSent && family.isNotEmpty()) "${prefs.familyFirstName} už má zkušební zprávu." else null,
                 "Teď ťukněte dole na Hotovo.")
         } else {
