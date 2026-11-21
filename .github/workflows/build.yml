@@ -3,6 +3,8 @@ name: Sestavit aplikaci
 on:
   push:
     branches: [main]
+  # Kontrola návrhu změn: jen sestavit, nic nezveřejňovat
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -29,7 +31,15 @@ jobs:
       - name: Pojmenovat soubor
         run: cp app/build/outputs/apk/debug/app-debug.apk DruhyNazor.apk
 
+      - name: Ulozit sestaveni navrhu
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DruhyNazor-navrh
+          path: DruhyNazor.apk
+
       - name: Zverejnit ke stazeni
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

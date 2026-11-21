@@ -72,9 +72,22 @@ class Prefs(context: Context) {
         get() = p.getBoolean("test_sent", false)
         set(v) = p.edit().putBoolean("test_sent", v).apply()
 
+    /** Jak rodina seniorovi říká, v 1. pádě: „Mamka: podvodná SMS“. */
     var seniorName: String
         get() = p.getString("senior_name", "Babička") ?: "Babička"
         set(v) = p.edit().putString("senior_name", v).apply()
+
+    /** Totéž ve 2. pádě: „telefon mamky“. */
+    val seniorGenitive: String get() = GENITIVE[seniorName] ?: seniorName
+
+    /** Křestní jméno prvního z rodiny do vět jako „Tomáš už o tom ví.“ */
+    val familyFirstName: String
+        get() = familyName.trim().split(' ').firstOrNull()?.takeIf { it.isNotBlank() } ?: "Rodina"
+
+    /** Kdy naposledy dostala rodina SMS, že ochrana není celá zapnutá (aby nechodila pořád). */
+    var setupAlertTime: Long
+        get() = d.getLong("setup_alert_time", 0L)
+        set(v) = d.edit().putLong("setup_alert_time", v).apply()
 
     /** Kanál v aplikaci ntfy, přes který chodí upozornění rodině. */
     var familyChannel: String
@@ -143,6 +156,12 @@ class Prefs(context: Context) {
     }
 
     companion object {
+        /** Oslovení na obrazovce „Jak vám Tomáš říká?“ → jméno do zpráv rodině. */
+        val CALLS = listOf("Mami" to "Mamka", "Tati" to "Taťka", "Babi" to "Babička", "Dědo" to "Děda")
+        const val OTHER = "Váš blízký"
+        private val GENITIVE = mapOf("Mamka" to "mamky", "Taťka" to "taťky", "Babička" to "babičky",
+            "Děda" to "dědy", OTHER to "vašeho blízkého")
+
         private const val WEEK = 7L * 24 * 3600 * 1000
 
         /** Číslo začínající +xxx nebo 00xxx, které není české (+420). */

@@ -13,10 +13,15 @@ import android.widget.Toast
 import cz.druhynazor.Ui.dp
 import java.util.Date
 
-/** Druhý názor uvnitř Postaráno: stav ochrany, zprávy a nastavení pro test. */
+/**
+ * Dvě obrazovky v jedné:
+ * - Zprávy (pro seniora): jen seznam zpráv.
+ * - Pro rodinu: dokončit nastavení, komu psát, jak seniorovi říkají a schované nastavení pro zkoušení.
+ */
 class DruhyNazorActivity : Activity() {
 
     private val onlyMessages get() = intent?.getBooleanExtra(EXTRA_ONLY_MESSAGES, false) == true
+    private var testShown = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,46 +45,64 @@ class DruhyNazorActivity : Activity() {
         val root = Ui.column(this, 16, 16).apply { setBackgroundColor(Ui.BG) }
         val permOk = DnSetupActivity.permsGranted(this)
 
-        root.addView(Ui.button(this, "‹  Zpět na Postaráno", Ui.BG, Ui.ACCENT, sp = 18f) { backHome() })
-
         if (onlyMessages) {
             root.addView(Ui.text(this, "Zprávy", 32f, bold = true))
-        } else {
-            root.addView(Ui.text(this, "Druhý názor", 32f, bold = true))
-            if (DnSetupActivity.allDone(this)) {
-                root.addView(Ui.text(this, "✅ Ochrana je zapnutá. Hovory a SMS jsou pod dohledem.", 20f, bold = true, color = Ui.OK))
+            if (!permOk) {
+                root.addView(Ui.text(this, "Zprávy se ukážou, až rodina dokončí nastavení.", 19f, color = Ui.MUTED))
             } else {
-                val setup = Ui.card(this)
-                setup.addView(Ui.text(this, "Nastavení ještě není hotové", 22f, bold = true, color = Ui.WARN))
-                setup.addView(Ui.text(this, "Bez něj vás aplikace nemusí včas varovat.", 17f, color = Ui.MUTED))
-                setup.addView(Ui.button(this, "Dokončit nastavení") {
-                    startActivity(Intent(this, DnSetupActivity::class.java))
-                })
-                root.addView(setup)
+                val list = SmsStore.latest(this)
+                if (list.isEmpty()) root.addView(Ui.text(this, "Zatím žádné zprávy.", 19f, color = Ui.MUTED))
+                for (sms in list) root.addView(messageRow(sms))
             }
+            show(root); return
         }
 
-        // ---- Zprávy ----
-        if (!onlyMessages) root.addView(Ui.text(this, "Zprávy", 24f, bold = true))
-        if (!permOk) {
-            root.addView(Ui.text(this, "Zprávy se ukážou po povolení oprávnění.", 17f, color = Ui.MUTED))
+        // ---- Pro rodinu ----
+        root.addView(Ui.text(this, "Pro rodinu", 32f, bold = true))
+        if (DnSetupActivity.allDone(this)) {
+            root.addView(Ui.text(this, "✅ Ochrana je celá zapnutá.", 20f, bold = true, color = Ui.OK))
         } else {
-            val list = SmsStore.latest(this)
-            if (list.isEmpty()) root.addView(Ui.text(this, "Zatím žádné zprávy.", 17f, color = Ui.MUTED))
-            for (sms in list) root.addView(messageRow(sms))
+            val setup = Ui.card(this).apply { background = Ui.rounded(Ui.WARN_SOFT, 20, this@DruhyNazorActivity) }
+            setup.addView(Ui.text(this, "Ochrana není celá zapnutá", 22f, bold = true, color = Ui.WARN))
+            setup.addView(Ui.text(this, "Ťukněte na Dokončit nastavení a projděte zbývající kroky.", 17f))
+            setup.addView(Ui.button(this, "Dokončit nastavení", Ui.WARN) {
+                startActivity(Intent(this, DnSetupActivity::class.java))
+            })
+            root.addView(setup)
         }
 
-        if (onlyMessages) { show(root); return }
-
-        // ---- Rodina ----
         root.addView(FamilyUi.card(this) { render() })
 
-        // ---- Zkušební nastavení ----
-        val cfg = Ui.card(this)
-        cfg.addView(Ui.text(this, "Nastavení pro test", 22f, bold = true))
+        // ---- Jak seniorovi říkají ----
+        val call = Ui.card(this)
+        call.addView(Ui.text(this, "Jak mu v rodině říkáte", 22f, bold = true))
+        call.addView(Ui.text(this, "Takhle bude psát v SMS, třeba „${prefs.seniorName}: podvodná SMS“.", 17f, color = Ui.MUTED))
+        (Prefs.CALLS.map { it.second } + Prefs.OTHER).chunked(3).forEach { names ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            names.forEachIndexed { i, name ->
+                val on = prefs.seniorName == name
+                val b = Ui.button(this, name, if (on) Ui.ACCENT else Ui.CARD,
+                    if (on) android.graphics.Color.WHITE else Ui.ACCENT, sp = 16f) {
+                    prefs.seniorName = name; render()
+                }.apply { setPadding(dp(4), dp(14), dp(4), dp(14)) }
+                row.addView(b, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    if (i < 2) marginEnd = dp(8)
+                })
+            }
+            // Zarovnat poslední řádek na stejnou šířku tlačítek
+            repeat(3 - names.size) { row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f)) }
+            call.addView(row)
+        }
+        root.addView(call)
 
-        cfg.addView(Ui.text(this, "Jak oslovit seniora v upozornění", 16f, color = Ui.MUTED))
-        val senior = Ui.input(this, prefs.seniorName, "Babička"); cfg.addView(senior)
+        // ---- Zkušební nastavení (jen pro zkoušení, schované) ----
+        if (!testShown) {
+            root.addView(Ui.button(this, "Nastavení pro zkoušení", Ui.BG, Ui.MUTED, sp = 16f) { testShown = true; render() })
+            show(root); return
+        }
+        val cfg = Ui.card(this)
+        cfg.addView(Ui.text(this, "Nastavení pro zkoušení", 22f, bold = true))
+
         cfg.addView(Ui.text(this, "Čísla, která se v testu chovají jako podvodníci (oddělte čárkou)", 16f, color = Ui.MUTED))
         val scam = Ui.input(this, prefs.testScamNumbers, "např. 777 111 222", multi = true); cfg.addView(scam)
         cfg.addView(Ui.text(this, "Po kolika minutách hovoru s neznámým číslem upozornit rodinu", 16f, color = Ui.MUTED))
@@ -92,7 +115,6 @@ class DruhyNazorActivity : Activity() {
         }
         cfg.addView(block)
         cfg.addView(Ui.button(this, "Uložit nastavení", Ui.ACCENT, sp = 19f) {
-            prefs.seniorName = senior.text.toString().trim().ifEmpty { "Babička" }
             prefs.testScamNumbers = scam.text.toString().trim()
             prefs.longCallMinutes = minutes.text.toString().trim().toIntOrNull() ?: 3
             prefs.blockScamCalls = block.isChecked
@@ -128,11 +150,6 @@ class DruhyNazorActivity : Activity() {
         cfg.addView(Ui.text(this,
             "Až budete test končit: Nastavení telefonu → Aplikace → Výchozí aplikace → SMS a vraťte původní aplikaci Zprávy.",
             15f, color = Ui.MUTED))
-        cfg.addView(Ui.button(this, "Odebrat Druhý názor z úvodní obrazovky", Ui.CARD, Ui.BAD, sp = 17f) {
-            Modules.uninstall(this, Modules.DN)
-            Toast.makeText(this, "Odebráno. Vrátit ho jde přes „Přidat pomocníka“.", Toast.LENGTH_LONG).show()
-            backHome()
-        })
         val version = try { packageManager.getPackageInfo(packageName, 0).versionName } catch (e: Exception) { "?" }
         cfg.addView(Ui.text(this, "Verze aplikace: $version", 15f, color = Ui.MUTED))
         root.addView(cfg)

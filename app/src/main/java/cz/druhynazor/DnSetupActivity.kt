@@ -20,8 +20,10 @@ import android.widget.ScrollView
 import android.widget.Toast
 
 /**
- * Průvodce zapnutím Druhého názoru: jedna obrazovka, jedna věc, velké tlačítko Dál.
- * Hlas čte nahlas, co se děje. Hotové kroky přeskakuje.
+ * Průvodce zapnutím ochrany: jedna obrazovka, jedna věc, velké tlačítko Dál.
+ * Hlas čte nahlas, co se děje. Hotové a nepotřebné kroky přeskakuje
+ * (český hlas jen když chybí, WhatsApp a Messenger jen když jsou v telefonu).
+ * Rodina se vybírá už před průvodcem, tady jsou jen povolení.
  */
 class DnSetupActivity : Activity() {
 
@@ -69,12 +71,11 @@ class DnSetupActivity : Activity() {
 
     /** Kroky, které na začátku průvodce ještě nebyly hotové. */
     private lateinit var todo: List<Step>
-    /** -1 = úvod, 0..n-1 = krok, n = rodina. */
+    /** -1 = úvod, 0..n-1 = krok, n = konec. */
     private var index = -1
     private var awaiting = false
     private var failed = false
     private var spokenFor = Int.MIN_VALUE
-    private var familyShown = false
     private var ready = false
     /** Krok Zprávy: obálka už je na ploše, teď schovat původní ikonu. */
     private var uklidPinned = false
@@ -92,9 +93,9 @@ class DnSetupActivity : Activity() {
         Voice.check(this) { ok ->
             Prefs(this).voiceOk = ok
             todo = steps.filter { !isDone(this, it.id) }
-            index = if (todo.isEmpty()) todo.size else -1
+            index = -1
             ready = true
-            if (!isFinishing) render()
+            if (todo.isEmpty()) { setResult(RESULT_OK); finish() } else if (!isFinishing) render()
         }
     }
 
@@ -103,8 +104,7 @@ class DnSetupActivity : Activity() {
         if (permsGranted(this)) GuardService.start(this)
         if (!ready) return
         evaluate()
-        // Obrazovku s rodinou nepřekreslovat, aby nezmizelo rozepsané jméno nebo číslo.
-        if (!(index >= todo.size && familyShown)) render()
+        render()
     }
 
     override fun onDestroy() {
@@ -133,11 +133,11 @@ class DnSetupActivity : Activity() {
     private fun next() { failed = false; index++; render() }
 
     private fun render() {
+        if (index >= todo.size) { setResult(RESULT_OK); finish(); return }
         val root = Ui.column(this, 20, 18).apply { setBackgroundColor(Ui.BG) }
         when {
             index < 0 -> intro(root)
-            index < todo.size -> stepScreen(root, todo[index])
-            else -> family(root)
+            else -> stepScreen(root, todo[index])
         }
         setContentView(ScrollView(this).apply { setBackgroundColor(Ui.BG); isFillViewport = true; addView(root) })
     }
@@ -163,8 +163,13 @@ class DnSetupActivity : Activity() {
 
     private fun intro(root: LinearLayout) {
         root.addView(bigIcon("🛡️"))
-        root.addView(Ui.text(this, "Zapneme Druhý názor", 30f, bold = true, center = true))
-        val t = "Telefon se teď zeptá na ${todo.size} povolení. Projdeme je spolu, jedno po druhém. Stačí ťukat na velké tlačítko Dál."
+        root.addView(Ui.text(this, "Zapneme ochranu", 30f, bold = true, center = true))
+        val n = todo.size
+        val t = when (n) {
+            1 -> "Zbývá jedna věc. Stačí ťuknout na velké tlačítko Dál."
+            in 2..4 -> "Zbývají $n věci. Projdeme je spolu, jednu po druhé. Stačí ťukat na velké tlačítko Dál."
+            else -> "Zbývá $n věcí. Projdeme je spolu, jednu po druhé. Stačí ťukat na velké tlačítko Dál."
+        }
         root.addView(sayBox(t))
         speakOnce(t)
         root.addView(Ui.button(this, "Dál") { next() })
@@ -181,14 +186,14 @@ class DnSetupActivity : Activity() {
             speakOnce(t)
             step.note?.let { root.addView(Ui.text(this, it, 16f, color = Ui.MUTED)) }
             root.addView(Ui.button(this, "Zkusit znovu") { act(step) })
-            root.addView(Ui.button(this, "Přeskočit, zapnu to později", Ui.CARD, Ui.ACCENT, sp = 18f) { next() })
+            root.addView(later { next() })
         } else {
             val t = "${step.why} Teď se objeví okénko telefonu. ${step.hint}"
             root.addView(sayBox(t))
             speakOnce(t)
             root.addView(Ui.button(this, step.button) { act(step) })
             if (step.id == "voice") {
-                root.addView(Ui.button(this, "Ne, bez hlasu", Ui.CARD, Ui.ACCENT, sp = 18f) { next() })
+                root.addView(later("Ne, bez hlasu") { next() })
             }
         }
     }
@@ -206,8 +211,12 @@ class DnSetupActivity : Activity() {
             uklidPinned = false
             next()
         })
-        root.addView(Ui.button(this, "Přeskočit", Ui.CARD, Ui.ACCENT, sp = 18f) { uklidPinned = false; next() })
+        root.addView(later { uklidPinned = false; next() })
     }
+
+    /** Malé nenápadné tlačítko dole. Hlavní cesta je vždy velké tlačítko nad ním. */
+    private fun later(label: String = "Později", onClick: () -> Unit) =
+        Ui.button(this, label, Ui.BG, Ui.MUTED, sp = 16f) { onClick() }
 
     /** Dá na plochu obálku Zprávy, která otevře naše zprávy. */
     private fun pinMessages(): Boolean {
@@ -253,21 +262,6 @@ class DnSetupActivity : Activity() {
         startActivityForResult(rm.createRequestRoleIntent(role), 11)
     }
 
-    private fun family(root: LinearLayout) {
-        familyShown = true
-        root.addView(bigIcon("👨‍👩‍👧"))
-        root.addView(Ui.text(this, "Propojit s rodinou", 28f, bold = true, center = true))
-        val t = "Vyberte, komu z rodiny má aplikace napsat, když přijde něco podezřelého. Rodina nemusí nic instalovat."
-        root.addView(sayBox(t))
-        speakOnce(t)
-        root.addView(FamilyUi.card(this) { render() })
-        root.addView(Ui.button(this, "Hotovo") {
-            if (Prefs(this).familyContacts.isEmpty()) {
-                Toast.makeText(this, "Přidejte aspoň jednoho člověka z rodiny.", Toast.LENGTH_LONG).show()
-            } else { setResult(RESULT_OK); finish() }
-        })
-        root.addView(Ui.button(this, "Přeskočit, nastavím později", Ui.BG, Ui.MUTED, sp = 17f) { setResult(RESULT_OK); finish() })
-    }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
@@ -279,7 +273,6 @@ class DnSetupActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
-        if (FamilyUi.onResult(this, requestCode, resultCode, data)) { render(); return }
         evaluate(); render()
     }
 
@@ -306,7 +299,7 @@ class DnSetupActivity : Activity() {
             "calls" -> roleHeld(ctx, RoleManager.ROLE_CALL_SCREENING)
             "overlay" -> ScamCallActivity.canShow(ctx)
             "fullscreen" -> Build.VERSION.SDK_INT < 34 || ctx.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
-            "chats" -> ChatWatcher.isEnabled(ctx)
+            "chats" -> !ChatWatcher.anyChatInstalled(ctx) || ChatWatcher.isEnabled(ctx)
             "voice" -> Prefs(ctx).voiceOk
             "uklid" -> Prefs(ctx).uklidDone
             else -> true

@@ -12,7 +12,7 @@ data class Module(
     val icon: String,
     /** Jedna věta na kartičce: co uvidí senior. */
     val desc: String,
-    /** Pomocník je opravdu hotový a jde zapnout. Ostatní mají „Připravujeme“. */
+    /** Pomocník je opravdu hotový. Jen hotové senior vidí a jsou zapnuté samy. */
     val ready: Boolean,
     /** Schovaný pod odkazem „Další pomocníci“, aby úvodní nabídka nebyla přeplněná. */
     val more: Boolean,
@@ -23,7 +23,7 @@ data class Module(
     val pozn: String? = null,
 )
 
-/** Katalog pomocníků a to, které jsou na tomto telefonu zapnuté. */
+/** Seznam pomocníků. Hotové jsou zapnuté samy, nehotové se nikde neukazují. */
 object Modules {
     const val DN = "dn"
 
@@ -95,31 +95,18 @@ object Modules {
 
     private fun prefs(ctx: Context) = ctx.applicationContext.getSharedPreferences("postarano", Context.MODE_PRIVATE)
 
-    /** Zapnutí pomocníci. Kdo měl dřív samostatný Druhý názor, má ho rovnou zapnutý. */
-    fun installed(ctx: Context): Set<String> {
+    /**
+     * Zapnutí pomocníci. Katalog ani instalování už není: co je hotové, je zapnuté samo.
+     * Nehotové pomocníky senior nevidí. Až bude některý hotový, objeví se po aktualizaci sám.
+     */
+    fun installed(ctx: Context): Set<String> = all.filter { it.ready }.map { it.id }.toSet()
+
+    /** Uživatel už prošel úvodem (rodina a jak mu říkají). Starší verze ukládaly seznam pomocníků. */
+    fun onboarded(ctx: Context): Boolean {
         val p = prefs(ctx)
-        if (!p.contains("installed")) {
-            val start = if (oldDruhyNazorUser(ctx)) setOf(DN) else emptySet()
-            p.edit().putStringSet("installed", start).apply()
-            return start
-        }
-        return p.getStringSet("installed", emptySet())!!.toSet()
+        return p.getBoolean("onboarded", false) || !p.getStringSet("installed", null).isNullOrEmpty() ||
+            oldDruhyNazorUser(ctx)
     }
-
-    fun install(ctx: Context, id: String) {
-        prefs(ctx).edit().putStringSet("installed", installed(ctx) + id).apply()
-    }
-
-    fun uninstall(ctx: Context, id: String) {
-        prefs(ctx).edit().putStringSet("installed", installed(ctx) - id).apply()
-    }
-
-    /** Pro koho je aplikace nastavená (Mamka, Babička…), nebo null = pro sebe. */
-    fun forWhom(ctx: Context): String? = prefs(ctx).getString("for_whom", null)
-    fun setForWhom(ctx: Context, v: String?) = prefs(ctx).edit().putString("for_whom", v).apply()
-
-    /** Uživatel už prošel úvodem (výběr pro koho a katalog). */
-    fun onboarded(ctx: Context): Boolean = prefs(ctx).getBoolean("onboarded", false) || installed(ctx).isNotEmpty()
     fun setOnboarded(ctx: Context) = prefs(ctx).edit().putBoolean("onboarded", true).apply()
 
     private fun oldDruhyNazorUser(ctx: Context): Boolean {

@@ -17,6 +17,17 @@
 
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
+    <!-- Aby aplikace poznala, jestli je v telefonu WhatsApp nebo Messenger nebo jiný chat (jinak krok přeskočí) -->
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+        <package android:name="com.facebook.orca" />
+        <package android:name="com.facebook.mlite" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.viber.voip" />
+        <package android:name="com.instagram.android" />
+    </queries>
+
     <application
         android:label="Postaráno"
         android:icon="@drawable/ic_shield"
