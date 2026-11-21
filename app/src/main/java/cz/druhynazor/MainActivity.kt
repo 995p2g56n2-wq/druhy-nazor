@@ -106,6 +106,7 @@ class MainActivity : Activity() {
         root.addView(Ui.text(this, "Ochrana před podvody.\nRodina je vždy v obraze.", 24f, bold = true, center = true))
         root.addView(Ui.text(this, "Teď ťukněte dole na Zapnout ochranu.", 20f, center = true))
         spacer(root, 40)
+        root.addView(Ui.text(this, "👇", 44f, center = true))
         root.addView(Ui.button(this, "Zapnout ochranu", sp = 24f) {
             // Rodina se obnovila ze zálohy (nový telefon): rovnou na povolení
             if (Prefs(this).familyContacts.isNotEmpty()) startSetup() else go(Screen.FAMILY)
