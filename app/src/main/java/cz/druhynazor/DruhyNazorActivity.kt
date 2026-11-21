@@ -77,14 +77,26 @@ class DruhyNazorActivity : Activity() {
             root.addView(setup)
         }
 
+        // ---- Ikony na plochu (jedním ťuknutím, kdyby je někdo omylem odebral) ----
+        val icons = Ui.card(this)
+        icons.addView(Ui.text(this, "Ikony na plochu", 22f, bold = true))
+        icons.addView(Ui.text(this, "Když ikona z plochy zmizí, ťukněte sem a pak v okénku na Přidat.", 17f, color = Ui.MUTED))
+        icons.addView(Ui.button(this, "✉️  Dát na plochu obálku Zprávy", Ui.CARD, Ui.ACCENT, sp = 18f) {
+            DnSetupActivity.pinShortcut(this, "zpravy")
+        })
+        icons.addView(Ui.button(this, "🛡️  Dát na plochu štít Postaráno", Ui.CARD, Ui.ACCENT, sp = 18f) {
+            DnSetupActivity.pinShortcut(this, "app")
+        })
+        root.addView(icons)
+
         // ---- Schovat původní Zprávy (nepovinné, dělá rodina) ----
         if (!prefs.uklidDone) {
             val hide = Ui.card(this)
             hide.addView(Ui.text(this, "Schovat původní Zprávy", 22f, bold = true))
-            hide.addView(Ui.text(this, "Nepovinné. Na ploše pak zůstane jen obálka Zprávy, která hlídá podvody. Postup:", 17f, color = Ui.MUTED))
+            hide.addView(Ui.text(this, "Nepovinné. Na ploše pak zůstane jen naše obálka ✉️ Zprávy, která hlídá podvody. Postup:", 17f, color = Ui.MUTED))
             hide.addView(Ui.text(this,
                 "1.  Ťukněte dole na tlačítko Domů.\n" +
-                "2.  Podržte prst na původní ikoně Zprávy.\n" +
+                "2.  Podržte prst na původní ikoně Zprávy. To je ta s bublinou, ne naše obálka ✉️.\n" +
                 "3.  Ťukněte na Odebrat. Pozor, ne Odinstalovat.\n" +
                 "4.  Vraťte se sem: ťukněte na ikonu Postaráno se štítem a dole na Pro rodinu.", 18f))
             hide.addView(Ui.button(this, "Hotovo, je schovaná", Ui.CARD, Ui.ACCENT, sp = 18f) {

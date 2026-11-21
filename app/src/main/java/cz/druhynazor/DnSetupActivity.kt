@@ -250,27 +250,7 @@ class DnSetupActivity : Activity() {
         }, 2500)
     }
 
-    /** Dá na plochu štít Postaráno nebo obálku Zprávy. */
-    private fun pin(what: String): Boolean {
-        val sm = getSystemService(ShortcutManager::class.java) ?: return false
-        if (!sm.isRequestPinShortcutSupported) return false
-        val info = if (what == "app") {
-            ShortcutInfo.Builder(this, "postarano")
-                .setShortLabel("Postaráno")
-                .setIcon(Icon.createWithResource(this, R.drawable.ic_shield))
-                .setIntent(Intent(this, MainActivity::class.java).setAction(Intent.ACTION_MAIN))
-                .build()
-        } else {
-            ShortcutInfo.Builder(this, "zpravy")
-                .setShortLabel("Zprávy")
-                .setIcon(Icon.createWithResource(this, R.drawable.ic_envelope))
-                .setIntent(Intent(this, DruhyNazorActivity::class.java)
-                    .setAction(Intent.ACTION_VIEW)
-                    .putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true))
-                .build()
-        }
-        return try { sm.requestPinShortcut(info, null) } catch (e: Exception) { false }
-    }
+    private fun pin(what: String): Boolean = pinShortcut(this, what)
 
     private fun act(step: Step) {
         speaker.stop()
@@ -324,6 +304,28 @@ class DnSetupActivity : Activity() {
     }
 
     companion object {
+        /** Dá na plochu štít Postaráno nebo obálku Zprávy. */
+        fun pinShortcut(ctx: Context, what: String): Boolean {
+            val sm = ctx.getSystemService(ShortcutManager::class.java) ?: return false
+            if (!sm.isRequestPinShortcutSupported) return false
+            val info = if (what == "app") {
+                ShortcutInfo.Builder(ctx, "postarano")
+                    .setShortLabel("Postaráno")
+                    .setIcon(Icon.createWithResource(ctx, R.drawable.ic_shield))
+                    .setIntent(Intent(ctx, MainActivity::class.java).setAction(Intent.ACTION_MAIN))
+                    .build()
+            } else {
+                ShortcutInfo.Builder(ctx, "zpravy")
+                    .setShortLabel("Zprávy")
+                    .setIcon(Icon.createWithResource(ctx, R.drawable.ic_envelope))
+                    .setIntent(Intent(ctx, DruhyNazorActivity::class.java)
+                        .setAction(Intent.ACTION_VIEW)
+                        .putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true))
+                    .build()
+            }
+            return try { sm.requestPinShortcut(info, null) } catch (e: Exception) { false }
+        }
+
         fun perms(): Array<String> {
             val list = mutableListOf(
                 Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS, Manifest.permission.SEND_SMS,
