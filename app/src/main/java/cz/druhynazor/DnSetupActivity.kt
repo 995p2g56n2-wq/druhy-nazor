@@ -81,13 +81,10 @@ class DnSetupActivity : Activity() {
             "V okénku pak ťukněte na Postaráno a potvrďte."),
         Step("overlay", "🚨", "Varování při hovoru",
             "Když volá podvodník, ukážu přes celou obrazovku červené varování.",
-            "Pak najděte Postaráno, zapněte přepínač a vraťte se šipkou zpět."),
-        Step("fullscreen", "❓", "Otázka po hovoru",
-            "Po hovoru s neznámým číslem se zeptám, jestli po vás nechtěl peníze.",
-            "Pak zapněte přepínač u Postaráno a vraťte se šipkou zpět."),
+            "V seznamu pak najděte Postaráno a zapněte přepínač. Sem se vrátím sám."),
         Step("chats", "🟢", "WhatsApp a Messenger",
             "Budu hlídat i WhatsApp a Messenger.",
-            "Pak najděte Postaráno, zapněte ho a vraťte se šipkou zpět.",
+            "Pak zapněte přepínač a potvrďte Povolit. Sem se vrátím sám.",
             note = "Je-li přepínač šedý („Omezené nastavení“): Nastavení → Aplikace → Postaráno → ⋮ vpravo nahoře → Povolit omezená nastavení. Pak to zkuste znovu."),
     ) }
 
@@ -130,6 +127,8 @@ class DnSetupActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        watcher.removeCallbacksAndMessages(null)
+        paused = false
         if (permsGranted(this)) GuardService.start(this)
         if (!ready) return
         evaluate()
@@ -274,12 +273,50 @@ class DnSetupActivity : Activity() {
             "perms" -> requestPermissions(perms(), 10)
             "sms" -> requestRole(RoleManager.ROLE_SMS)
             "calls" -> requestRole(RoleManager.ROLE_CALL_SCREENING)
-            "overlay" -> startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            "overlay" -> {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+                watchAndReturn(step.id)
+            }
             "fullscreen" -> if (Build.VERSION.SDK_INT >= 34) {
                 startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:$packageName")))
             } else { awaiting = false; next() }
-            "chats" -> startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            "chats" -> {
+                // Rovnou na přepínač Postaráno, ne na seznam všech aplikací
+                val direct = if (Build.VERSION.SDK_INT >= 30)
+                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).putExtra(
+                        Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
+                        android.content.ComponentName(this, ChatWatcher::class.java).flattenToString())
+                else null
+                try { startActivity(direct ?: Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+                catch (e: Exception) { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+                watchAndReturn(step.id)
+            }
         }
+    }
+
+    private val watcher = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * Přepínač v nastavení telefonu: jakmile ho člověk zapne, vrátíme se sami.
+     * Nikdo nemusí hledat šipku zpět.
+     */
+    private fun watchAndReturn(id: String) {
+        watcher.removeCallbacksAndMessages(null)
+        val until = System.currentTimeMillis() + 3 * 60_000
+        val check = object : Runnable {
+            override fun run() {
+                if (!paused || isFinishing) return
+                if (isDone(this@DnSetupActivity, id)) {
+                    try {
+                        startActivity(Intent(this@DnSetupActivity, DnSetupActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+                    } catch (_: Exception) { }
+                    return
+                }
+                if (System.currentTimeMillis() < until) watcher.postDelayed(this, 600)
+            }
+        }
+        watcher.postDelayed(check, 1000)
     }
 
     private fun requestRole(role: String) {
@@ -358,7 +395,9 @@ class DnSetupActivity : Activity() {
             else -> true
         }
 
-        private val REQUIRED = listOf("perms", "sms", "calls", "overlay", "fullscreen", "chats")
+        // „fullscreen“ (otázka po hovoru přes celou obrazovku) už není potřeba zvlášť:
+        // se svolením „overlay“ smí Postaráno otázku po hovoru otevřít rovnou.
+        private val REQUIRED = listOf("perms", "sms", "calls", "overlay", "chats")
 
         /** Lidské názvy kroků pro obrazovku Pro rodinu. */
         private val TITLES = mapOf(
@@ -366,7 +405,6 @@ class DnSetupActivity : Activity() {
             "sms" to "Postaráno jako aplikace na zprávy",
             "calls" to "Hlídání hovorů",
             "overlay" to "Varování přes celou obrazovku při hovoru",
-            "fullscreen" to "Otázka po hovoru",
             "chats" to "Hlídání WhatsAppu a Messengeru",
         )
 
