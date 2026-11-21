@@ -8,9 +8,48 @@ import android.widget.LinearLayout
 import android.widget.Toast
 import cz.druhynazor.Ui.dp
 
-/** Karta „Komu psát z rodiny“: výběr z kontaktů, ruční přidání, odebrání a zkušební SMS. */
+/**
+ * Karta „Komu z rodiny psát“: výběr z kontaktů, ruční přidání, odebrání a zkušební SMS.
+ * Každá změna se rodině ohlásí SMS a odebrání jde vrátit jedním ťuknutím.
+ */
 object FamilyUi {
     const val REQ_PICK = 31
+
+    /** Naposledy odebraný člověk, aby šel vrátit. */
+    private var lastRemoved: FamilyContact? = null
+
+    /** První SMS novému člověku z rodiny: co od aplikace čekat. */
+    fun welcomeText(prefs: Prefs) =
+        "Postaráno: Dobrý den, od teď vám napíšu, když na telefon ${prefs.seniorGenitive} přijde podvod " +
+        "nebo něco podezřelého. U nejasné zprávy stačí odpovědět ANO, nebo NE. Nic nemusíte instalovat."
+
+    private fun canSms(a: Activity) = a.checkSelfPermission(android.Manifest.permission.SEND_SMS) ==
+        android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    /** Výběr člověka z kontaktů. */
+    fun pick(a: Activity) {
+        try {
+            @Suppress("DEPRECATION")
+            a.startActivityForResult(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI), REQ_PICK)
+        } catch (e: Exception) {
+            Toast.makeText(a, "Kontakty nejde otevřít, napište číslo ručně.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** Ruční zadání jména a čísla, když kontakty nejdou otevřít. */
+    fun manual(a: Activity, into: LinearLayout, onChanged: () -> Unit) {
+        val name = Ui.input(a, "", "Jméno, třeba Tomáš"); into.addView(name)
+        val phone = Ui.input(a, "", "Číslo, třeba 777 123 456", phone = true); into.addView(phone)
+        into.addView(Ui.button(a, "Přidat", Ui.CARD, Ui.ACCENT, sp = 17f) {
+            val n = name.text.toString().trim()
+            val p = phone.text.toString().trim()
+            if (p.filter { it.isDigit() }.length < 9) {
+                Toast.makeText(a, "Napište celé telefonní číslo.", Toast.LENGTH_LONG).show(); return@button
+            }
+            add(a, n.ifEmpty { p }, p)
+            onChanged()
+        })
+    }
 
     fun card(a: Activity, onChanged: () -> Unit): View {
         val prefs = Prefs(a)
@@ -30,32 +69,28 @@ object FamilyUi {
                 })
             row.addView(Ui.button(a, "Odebrat", Ui.CARD, Ui.BAD, sp = 15f) {
                 prefs.familyContacts = prefs.familyContacts.filter { it != c }
+                lastRemoved = c
+                if (canSms(a)) {
+                    Family.sendSms(a, c.phone, "Postaráno: Od teď vám už nebudu psát o telefonu ${prefs.seniorGenitive}.")
+                    Family.sms(a, "Postaráno: ${c.name} už nedostává zprávy o telefonu ${prefs.seniorGenitive}.")
+                }
                 onChanged()
             }.apply { setPadding(a.dp(12), a.dp(10), a.dp(12), a.dp(10)) })
             card.addView(row)
         }
 
-        card.addView(Ui.button(a, "+  Vybrat z kontaktů", sp = 19f) {
-            try {
-                @Suppress("DEPRECATION")
-                a.startActivityForResult(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI), REQ_PICK)
-            } catch (e: Exception) {
-                Toast.makeText(a, "Kontakty nejde otevřít, napište číslo ručně.", Toast.LENGTH_LONG).show()
-            }
-        })
+        lastRemoved?.takeIf { prefs.familyByNumber(it.phone) == null }?.let { r ->
+            card.addView(Ui.button(a, "↩  Vrátit ${r.name}", Ui.CARD, Ui.ACCENT, sp = 17f) {
+                lastRemoved = null
+                add(a, r.name, r.phone)
+                onChanged()
+            })
+        }
+
+        card.addView(Ui.button(a, "+  Vybrat z kontaktů", sp = 19f) { pick(a) })
 
         card.addView(Ui.text(a, "Nebo napsat ručně:", 16f, color = Ui.MUTED))
-        val name = Ui.input(a, "", "Jméno, třeba Standa"); card.addView(name)
-        val phone = Ui.input(a, "", "Číslo, třeba 777 123 456", phone = true); card.addView(phone)
-        card.addView(Ui.button(a, "Přidat", Ui.CARD, Ui.ACCENT, sp = 17f) {
-            val n = name.text.toString().trim()
-            val p = phone.text.toString().trim()
-            if (p.filter { it.isDigit() }.length < 9) {
-                Toast.makeText(a, "Napište celé telefonní číslo.", Toast.LENGTH_LONG).show(); return@button
-            }
-            add(a, n.ifEmpty { p }, p)
-            onChanged()
-        })
+        manual(a, card, onChanged)
 
         if (list.isNotEmpty()) {
             card.addView(Ui.button(a, "Poslat rodině zkušební SMS", Ui.CARD, Ui.ACCENT, sp = 17f) {
@@ -72,6 +107,9 @@ object FamilyUi {
             Toast.makeText(a, "Tohle číslo už v seznamu je.", Toast.LENGTH_SHORT).show(); return
         }
         prefs.familyContacts = prefs.familyContacts + FamilyContact(name, phone)
+        // Po dokončeném nastavení dostane nový člověk hned vysvětlení. Při prvním nastavení
+        // odejde až na konci, až aplikace smí posílat SMS.
+        if (prefs.testSent && canSms(a)) Family.sendSms(a, phone, welcomeText(prefs))
     }
 
     /** Výsledek z výběru kontaktu. Vrací true, když šlo o něj. */

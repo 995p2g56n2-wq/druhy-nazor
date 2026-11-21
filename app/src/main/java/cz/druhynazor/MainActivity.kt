@@ -1,7 +1,9 @@
 package cz.druhynazor
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
@@ -9,22 +11,22 @@ import android.widget.ScrollView
 import cz.druhynazor.Ui.dp
 
 /**
- * Postaráno – rodinný štít. Úvod (pro koho), katalog pomocníků s tlačítkem Instalovat
- * a úvodní obrazovka s velkými ikonami zapnutých pomocníků.
+ * Postaráno – rodinný štít.
+ *
+ * Nastavení se na nic neptá, co může aplikace zjistit nebo rozhodnout sama:
+ * 1. Zapnout ochranu  2. Komu dáme vědět  3. Jak vám říká  4. povolení  5. Hotovo.
+ * Katalog pomocníků není, hotoví pomocníci jsou zapnutí sami.
+ *
+ * Úvodní obrazovka pro seniora: velký stav (zelená / oranžová), dlaždice Zprávy a malé tlačítko Pro rodinu.
+ * Senior nic nenastavuje. Když něco nefunguje, rodina dostane SMS.
  */
 class MainActivity : Activity() {
 
-    private enum class Screen { START, WHO, CATALOG, INFO, DONE, HOME }
+    private enum class Screen { START, FAMILY, CALL, DONE, HOME }
 
     private var screen = Screen.HOME
-    private val selected = mutableSetOf<String>()
-    private var showMore = false
-    private var infoId = Modules.DN
-    private var infoFrom = Screen.CATALOG
+    private var manualShown = false
     private lateinit var speaker: Speaker
-
-    /** Pro koho se nastavuje: zobrazované jméno a tvar pro „Co chcete … nainstalovat?“ */
-    private val who = listOf("Mamka" to "mamce", "Babička" to "babičce", "Taťka" to "taťkovi", "Děda" to "dědovi")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,8 +53,11 @@ class MainActivity : Activity() {
         super.onResume()
         if (Modules.DN in Modules.installed(this) && DnSetupActivity.permsGranted(this)) GuardService.start(this)
         render()
-        // Hlídání po spuštění chvíli nabíhá (třeba po aktualizaci), stav pak zkontrolovat znovu
-        window.decorView.postDelayed({ if (screen == Screen.HOME && !isFinishing) render() }, 1500)
+        // Hlídání po spuštění chvíli nabíhá (třeba po aktualizaci), stav pak zkontrolovat znovu.
+        // Teprve potom případně dát vědět rodině, že ochrana není celá zapnutá.
+        window.decorView.postDelayed({
+            if (screen == Screen.HOME && !isFinishing) { render(); alertFamilyIfNeeded() }
+        }, 3000)
     }
 
     override fun onDestroy() {
@@ -65,9 +70,8 @@ class MainActivity : Activity() {
     @Deprecated("Activity API")
     override fun onBackPressed() {
         when (screen) {
-            Screen.WHO -> go(Screen.START)
-            Screen.CATALOG -> go(if (Modules.onboarded(this)) Screen.HOME else Screen.WHO)
-            Screen.INFO -> go(infoFrom)
+            Screen.FAMILY -> go(Screen.START)
+            Screen.CALL -> go(Screen.FAMILY)
             Screen.DONE -> go(Screen.HOME)
             Screen.START, Screen.HOME -> {
                 @Suppress("DEPRECATION")
@@ -80,175 +84,107 @@ class MainActivity : Activity() {
         val root = Ui.column(this, 20, 18).apply { setBackgroundColor(Ui.BG) }
         when (screen) {
             Screen.START -> start(root)
-            Screen.WHO -> whoScreen(root)
-            Screen.CATALOG -> catalog(root)
-            Screen.INFO -> info(root)
+            Screen.FAMILY -> familyScreen(root)
+            Screen.CALL -> callScreen(root)
             Screen.DONE -> done(root)
             Screen.HOME -> home(root)
         }
         setContentView(ScrollView(this).apply { setBackgroundColor(Ui.BG); isFillViewport = true; addView(root) })
     }
 
-    private fun back(root: LinearLayout) {
-        root.addView(Ui.button(this, "‹  Zpět", Ui.BG, Ui.ACCENT, sp = 18f) {
-            @Suppress("DEPRECATION") onBackPressed()
-        }.apply { layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
-    }
-
     private fun spacer(root: LinearLayout, dpH: Int = 24) =
         root.addView(View(this), LinearLayout.LayoutParams(1, dp(dpH)))
 
-    // ---------- Úvod ----------
+    private fun canSms() = checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+
+    // ---------- 1. Úvod: jedno tlačítko ----------
 
     private fun start(root: LinearLayout) {
         spacer(root, 40)
-        root.addView(Ui.text(this, "🛡️", 72f, center = true))
+        root.addView(Ui.text(this, "🛡️", 80f, center = true))
         root.addView(Ui.text(this, "Postaráno", 36f, bold = true, center = true))
-        root.addView(Ui.text(this, "rodinný štít", 20f, color = Ui.ACCENT, center = true))
-        root.addView(Ui.text(this, "Jedna aplikace.\nKlidný spánek pro celou rodinu.", 24f, bold = true, center = true))
-        root.addView(Ui.text(this, "Vyberete si jen to, co opravdu potřebujete.", 18f, color = Ui.MUTED, center = true))
+        root.addView(Ui.text(this, "Ochrana před podvody.\nRodina je vždy v obraze.", 24f, bold = true, center = true))
         spacer(root, 40)
-        root.addView(Ui.button(this, "Začít") { go(Screen.WHO) })
-    }
-
-    private fun whoScreen(root: LinearLayout) {
-        back(root)
-        root.addView(Ui.text(this, "Pro koho aplikaci nastavujete?", 28f, bold = true))
-        root.addView(choice("Pro sebe") {
-            Modules.setForWhom(this, null); go(Screen.CATALOG)
+        root.addView(Ui.button(this, "Zapnout ochranu", sp = 24f) {
+            // Rodina se obnovila ze zálohy (nový telefon): rovnou na povolení
+            if (Prefs(this).familyContacts.isNotEmpty()) startSetup() else go(Screen.FAMILY)
         })
-        root.addView(Ui.text(this, "Nebo pro někoho blízkého:", 18f, color = Ui.MUTED))
-        for ((name, _) in who) {
-            root.addView(choice(name) {
-                Modules.setForWhom(this, name)
-                Prefs(this).seniorName = name
-                go(Screen.CATALOG)
-            })
+    }
+
+    // ---------- 2. Komu dáme vědět ----------
+
+    private fun familyScreen(root: LinearLayout) {
+        spacer(root, 16)
+        root.addView(Ui.text(this, "👨‍👩‍👧", 72f, center = true))
+        root.addView(Ui.text(this, "Komu dáme vědět, když se něco stane?", 28f, bold = true, center = true))
+        root.addView(Ui.text(this, "Vyberte někoho z rodiny. Nic nemusí instalovat, přijde mu jen SMS.", 20f, center = true))
+        spacer(root, 16)
+        root.addView(Ui.button(this, "Vybrat z kontaktů", sp = 22f) { FamilyUi.pick(this) })
+        if (manualShown) {
+            FamilyUi.manual(this, root) { if (Prefs(this).familyContacts.isNotEmpty()) go(Screen.CALL) else render() }
+        } else {
+            root.addView(Ui.button(this, "Napsat číslo ručně", Ui.BG, Ui.MUTED, sp = 16f) { manualShown = true; render() })
         }
     }
 
-    private fun choice(label: String, onClick: (View) -> Unit) =
-        Ui.button(this, "$label   ›", Ui.CARD, Ui.INK, sp = 22f, onClick = onClick)
+    // ---------- 3. Jak vám říká ----------
 
-    // ---------- Katalog ----------
-
-    private fun catalog(root: LinearLayout) {
-        back(root)
-        val installed = Modules.installed(this)
-        val dative = who.firstOrNull { it.first == Modules.forWhom(this) }?.second
-        root.addView(Ui.text(this, if (dative != null) "Co chcete $dative nainstalovat?" else "Co chcete nainstalovat?", 28f, bold = true))
-        root.addView(Ui.text(this, "Vyberte jednoho nebo více pomocníků. Další můžete kdykoli přidat.", 18f, color = Ui.MUTED))
-
-        for (m in Modules.all.filter { !it.more || showMore }) root.addView(moduleCard(m, installed))
-
-        val hidden = Modules.all.count { it.more }
-        if (!showMore) {
-            root.addView(Ui.button(this, "+  Další pomocníci ($hidden)", Ui.BG, Ui.ACCENT, sp = 20f) { showMore = true; render() })
+    private fun callScreen(root: LinearLayout) {
+        val prefs = Prefs(this)
+        spacer(root, 16)
+        root.addView(Ui.text(this, "Jak vám ${prefs.familyFirstName} říká?", 28f, bold = true, center = true))
+        root.addView(Ui.text(this, "Podle toho mu budeme psát.", 20f, center = true, color = Ui.MUTED))
+        for ((label, name) in Prefs.CALLS) {
+            root.addView(Ui.button(this, label, Ui.CARD, Ui.INK, sp = 24f) { chooseCall(name) })
         }
-
-        val n = selected.size
-        root.addView(Ui.button(this, if (n > 0) "Pokračovat ($n)" else "Vyberte alespoň jednoho pomocníka",
-            if (n > 0) Ui.ACCENT else Ui.MUTED) { if (n > 0) installSelected() })
+        root.addView(Ui.button(this, "Jinak", Ui.BG, Ui.MUTED, sp = 18f) { chooseCall(Prefs.OTHER) })
     }
 
-    private fun moduleCard(m: Module, installed: Set<String>): View {
-        val on = m.id in selected
-        val card = Ui.card(this).apply {
-            background = Ui.rounded(if (on) Ui.ACCENT_SOFT else Ui.CARD, 20, this@MainActivity, if (on) Ui.ACCENT else null)
-        }
-        card.addView(Ui.text(this, "${m.icon}  ${m.name}", 22f, bold = true))
-        card.addView(Ui.text(this, m.desc, 18f))
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        row.addView(Ui.button(this, "Více informací", Ui.CARD, Ui.ACCENT, sp = 16f) {
-            infoId = m.id; infoFrom = Screen.CATALOG; go(Screen.INFO)
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(10) })
-        val action = when {
-            m.id in installed -> Ui.text(this, "✓ Zapnuto", 18f, bold = true, color = Ui.OK, center = true)
-            !m.ready -> Ui.text(this, "Připravujeme", 17f, color = Ui.MUTED, center = true)
-            else -> Ui.button(this, if (on) "✓ Vybráno" else "Instalovat", if (on) Ui.ACCENT else Ui.CARD, if (on) android.graphics.Color.WHITE else Ui.ACCENT, sp = 18f) {
-                if (on) selected.remove(m.id) else selected.add(m.id); render()
-            }
-        }
-        row.addView(action, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-            gravity = android.view.Gravity.CENTER_VERTICAL
-        })
-        card.addView(row)
-        return card
+    private fun chooseCall(name: String) {
+        Prefs(this).seniorName = name
+        startSetup()
     }
 
-    private fun info(root: LinearLayout) {
-        back(root)
-        val m = Modules.byId(infoId)
-        val installed = m.id in Modules.installed(this)
-        root.addView(Ui.text(this, m.icon, 64f, center = true))
-        root.addView(Ui.text(this, m.name, 28f, bold = true, center = true))
-        root.addView(Ui.text(this, m.co, 22f))
-        val all = listOf(m.co, "Jak to funguje.") + m.jak + listOf(m.rodina, m.bezpeci)
-        root.addView(Ui.button(this, "🔊  Přečíst mi to celé", Ui.CARD, Ui.ACCENT, sp = 18f) { speaker.say(all.joinToString(" ")) })
+    // ---------- 4. Povolení ----------
 
-        root.addView(section("Jak to funguje", m.jak.mapIndexed { i, s -> "${i + 1}.  $s" }.joinToString("\n\n")))
-        root.addView(section("Co uvidí rodina", m.rodina))
-        root.addView(section("Je to bezpečné?", m.bezpeci + (m.pozn?.let { "\n\n$it" } ?: "")))
-
-        when {
-            installed -> Unit
-            !m.ready -> root.addView(Ui.button(this, "Připravujeme", Ui.MUTED) { })
-            m.id in selected -> root.addView(Ui.button(this, "✓ Vybráno, zpět na nabídku") { go(Screen.CATALOG) })
-            else -> root.addView(Ui.button(this, "Instalovat") { selected.add(m.id); go(Screen.CATALOG) })
-        }
-    }
-
-    private fun section(title: String, body: String): View {
-        val c = Ui.card(this, 8)
-        c.addView(Ui.text(this, title, 21f, bold = true))
-        c.addView(Ui.text(this, body, 18f))
-        return c
-    }
-
-    // ---------- Instalace ----------
-
-    private fun installSelected() {
-        val fresh = selected.filter { it !in Modules.installed(this) }
-        fresh.forEach { Modules.install(this, it) }
+    private fun startSetup() {
         Modules.setOnboarded(this)
-        selected.clear()
         // Po návratu z průvodce (i přes Zpět) se ukáže kontrola na konec.
         screen = Screen.DONE
-        if (Modules.DN in fresh && !DnSetupActivity.allDone(this)) {
+        if (!DnSetupActivity.allDone(this)) {
             @Suppress("DEPRECATION")
             startActivityForResult(Intent(this, DnSetupActivity::class.java), REQ_DN_SETUP)
         } else render()
     }
 
+    // ---------- 5. Kontrola na konec ----------
+
     /**
-     * Kontrola na konec. Zelená = všechno zapnuté, rodina dostala zkušební zprávu.
+     * Zelená = všechno zapnuté, rodina dostala první SMS s vysvětlením.
      * Oranžová = něco chybí, jedním ťuknutím se dokončí.
      */
     private fun done(root: LinearLayout) {
-        val dn = Modules.DN in Modules.installed(this)
-        val ok = !dn || DnSetupActivity.allDone(this)
+        val ok = DnSetupActivity.allDone(this)
         val prefs = Prefs(this)
         val family = prefs.familyContacts
 
-        // Zkušební zpráva rodině, jen jednou a jen když je všechno zapnuté
-        if (dn && ok && family.isNotEmpty() && !prefs.testSent) {
+        // První SMS rodině: vysvětlení a zkouška. Jen jednou.
+        if (family.isNotEmpty() && !prefs.testSent && canSms()) {
             prefs.testSent = true
-            Family.sms(this, "Postaráno: Zkouška. Všechno je nastavené. Takhle vám přijde zpráva, " +
-                "když ${prefs.seniorName} dostane něco podezřelého. Teď nemusíte odpovídat.")
+            Family.sms(this, FamilyUi.welcomeText(prefs) + " Toto je zkouška, teď nemusíte odpovídat.")
         }
 
         root.setBackgroundColor(if (ok) Ui.OK_SOFT else Ui.WARN_SOFT)
         spacer(root, 40)
-        root.addView(Ui.text(this, if (ok) "✅" else "⚠️", 72f, center = true))
+        root.addView(Ui.text(this, if (ok) "✅" else "⚠️", 80f, center = true))
         val lines = if (ok) {
-            val who = when (family.size) { 0 -> null; 1 -> family[0].name; else -> "Rodina" }
-            listOfNotNull("Všechno je hotové.", "Jste chránění.",
-                who?.let { "$it už má zkušební zprávu." })
+            listOfNotNull("Hotovo.", "Jste chránění.",
+                if (prefs.testSent && family.isNotEmpty()) "${prefs.familyFirstName} už má zkušební zprávu." else null)
         } else {
             listOf("Skoro hotovo.", "Ochrana ještě není celá zapnutá.", "Ťukněte na Dokončit.")
         }
-        root.addView(Ui.text(this, lines[0], 34f, bold = true, center = true, color = if (ok) Ui.OK else Ui.WARN))
-        lines.drop(1).forEach { root.addView(Ui.text(this, it, 22f, center = true)) }
+        root.addView(Ui.text(this, lines[0], 36f, bold = true, center = true, color = if (ok) Ui.OK else Ui.WARN))
+        lines.drop(1).forEach { root.addView(Ui.text(this, it, 24f, center = true)) }
         speakDone(lines.joinToString(" "))
         spacer(root, 40)
         if (ok) {
@@ -258,7 +194,7 @@ class MainActivity : Activity() {
                 @Suppress("DEPRECATION")
                 startActivityForResult(Intent(this, DnSetupActivity::class.java), REQ_DN_SETUP)
             })
-            root.addView(Ui.button(this, "Později", Ui.CARD, Ui.ACCENT, sp = 18f) { go(Screen.HOME) })
+            root.addView(Ui.button(this, "Později", Ui.BG, Ui.MUTED, sp = 16f) { go(Screen.HOME) })
         }
     }
 
@@ -269,46 +205,43 @@ class MainActivity : Activity() {
         speaker.say(text)
     }
 
-    // ---------- Úvodní obrazovka ----------
+    // ---------- Úvodní obrazovka seniora ----------
 
     private fun home(root: LinearLayout) {
-        val installed = Modules.installed(this)
-        root.addView(Ui.text(this, "Dobrý den", 34f, bold = true))
+        val prefs = Prefs(this)
+        val ok = DnSetupActivity.allDone(this)
+        val family = prefs.familyContacts
 
-        if (Modules.DN in installed) {
-            val ok = DnSetupActivity.allDone(this)
-            val status = Ui.card(this, 4).apply {
-                background = Ui.rounded(if (ok) Ui.OK_SOFT else Ui.WARN_SOFT, 18, this@MainActivity)
-            }
-            status.addView(Ui.text(this, if (ok) "✅  Všechno v pořádku" else "⚠️  Ochrana není celá zapnutá", 20f, bold = true,
-                color = if (ok) Ui.OK else Ui.WARN))
-            status.addView(Ui.text(this, if (ok) "Hovory a SMS jsou pod dohledem." else "Ťukněte sem a dokončete nastavení.", 17f))
-            if (!ok) status.setOnClickListener { startActivity(Intent(this, DnSetupActivity::class.java)) }
-            root.addView(status)
+        // Velký stav. Senior tu nic nenastavuje, jen vidí, že je v bezpečí.
+        val status = Ui.card(this, 8).apply {
+            background = Ui.rounded(if (ok) Ui.OK_SOFT else Ui.WARN_SOFT, 22, this@MainActivity)
+            setPadding(dp(20), dp(28), dp(20), dp(28))
         }
+        status.addView(Ui.text(this, if (ok) "✅" else "⚠️", 64f, center = true))
+        status.addView(Ui.text(this, if (ok) "Jste chránění" else "Ochrana není celá zapnutá", 30f, bold = true,
+            center = true, color = if (ok) Ui.OK else Ui.WARN))
+        val sub = when {
+            ok -> "Hovory a zprávy hlídám za vás."
+            family.isNotEmpty() && canSms() -> "${prefs.familyFirstName} už o tom ví a opraví to."
+            else -> "Zavolejte rodině, ať vám to dokončí."
+        }
+        status.addView(Ui.text(this, sub, 21f, center = true))
+        root.addView(status)
 
+        // Dlaždice jen pro to, na co senior opravdu klepne
         val tiles = mutableListOf<Pair<String, () -> Unit>>()
-        for (m in Modules.all.filter { it.id in installed }) {
-            if (m.id == Modules.DN) {
-                tiles += "${m.icon}\n${m.name}" to { startActivity(Intent(this, DruhyNazorActivity::class.java)) }
-                tiles += "✉️\nZprávy" to {
-                    startActivity(Intent(this, DruhyNazorActivity::class.java).putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true))
-                }
-            } else {
-                tiles += "${m.icon}\n${m.name}" to { infoId = m.id; infoFrom = Screen.HOME; go(Screen.INFO) }
-            }
+        tiles += "✉️\nZprávy" to {
+            startActivity(Intent(this, DruhyNazorActivity::class.java).putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true))
         }
-        if (tiles.isEmpty()) {
-            root.addView(Ui.text(this, "Zatím tu není žádný pomocník.", 19f, color = Ui.MUTED))
-        }
+        // Další hotoví pomocníci (Dopisy, Energie) sem přibydou sami.
         tiles.chunked(2).forEach { pair ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             pair.forEachIndexed { i, (label, open) ->
-                val tile = Ui.button(this, label, Ui.CARD, Ui.INK, sp = 20f) { open() }.apply {
-                    minHeight = dp(150)
+                val tile = Ui.button(this, label, Ui.CARD, Ui.INK, sp = 26f) { open() }.apply {
+                    minHeight = dp(170)
                     maxLines = 4
                     ellipsize = null
-                    setPadding(dp(6), dp(14), dp(6), dp(14))
+                    setPadding(dp(6), dp(16), dp(6), dp(16))
                     background = Ui.rounded(Ui.CARD, 22, this@MainActivity, Ui.LINE)
                 }
                 row.addView(tile, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -318,20 +251,38 @@ class MainActivity : Activity() {
             root.addView(row)
         }
 
-        spacer(root, 16)
-        root.addView(Ui.button(this, "+  Přidat pomocníka", Ui.CARD, Ui.ACCENT, sp = 19f) {
-            selected.clear(); showMore = false; go(Screen.CATALOG)
+        spacer(root, 24)
+        root.addView(Ui.button(this, "Pro rodinu", Ui.BG, Ui.MUTED, sp = 16f) {
+            startActivity(Intent(this, DruhyNazorActivity::class.java))
         })
+    }
+
+    /**
+     * Ochrana není celá zapnutá: rodina dostane SMS, co ťuknout. Nejvýš jednou za den,
+     * senior to nemusí nikomu říkat.
+     */
+    private fun alertFamilyIfNeeded() {
+        val prefs = Prefs(this)
+        if (DnSetupActivity.allDone(this) || prefs.familyContacts.isEmpty() || !canSms()) return
+        val now = System.currentTimeMillis()
+        if (now - prefs.setupAlertTime < DAY) return
+        prefs.setupAlertTime = now
+        Family.sms(this, "Postaráno: Na telefonu ${prefs.seniorGenitive} není ochrana celá zapnutá. " +
+            "Až u něj budete, otevřete Postaráno, ťukněte dole na Pro rodinu a pak na Dokončit nastavení.")
     }
 
     @Deprecated("Activity API")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
+        if (FamilyUi.onResult(this, requestCode, resultCode, data)) {
+            if (screen == Screen.FAMILY && Prefs(this).familyContacts.isNotEmpty()) screen = Screen.CALL
+        }
         render()
     }
 
     companion object {
         private const val REQ_DN_SETUP = 20
+        private const val DAY = 24L * 3600 * 1000
     }
 }

@@ -151,6 +151,11 @@ class ChatWatcher : NotificationListenerService() {
             "com.instagram.android" to "Instagram"
         )
 
+        /** V telefonu je aspoň jeden chat, který umíme hlídat. Bez něj krok WhatsApp a Messenger odpadá. */
+        fun anyChatInstalled(context: Context): Boolean = APPS.keys.any {
+            try { context.packageManager.getPackageInfo(it, 0); true } catch (e: Exception) { false }
+        }
+
         fun isEnabled(context: Context): Boolean {
             val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners") ?: return false
             val me = ComponentName(context, ChatWatcher::class.java)
