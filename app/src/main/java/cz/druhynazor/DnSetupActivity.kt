@@ -97,6 +97,15 @@ class DnSetupActivity : Activity() {
         }
     }
 
+    /** Aplikaci zakrylo okénko telefonu (třeba „Přidat na plochu“). */
+    private var paused = false
+
+    override fun onPause() {
+        super.onPause()
+        paused = true
+        speaker.stop()
+    }
+
     override fun onResume() {
         super.onResume()
         if (permsGranted(this)) GuardService.start(this)
@@ -222,7 +231,19 @@ class DnSetupActivity : Activity() {
             "voice" -> Voice.fix(this)
             // Jen obálka na plochu. Schování původních Zpráv je mimo aplikaci, to udělá rodina
             // později podle návodu v Pro rodinu (senior by se z plochy zpátky nevrátil).
-            "uklid" -> { awaiting = false; pinMessages(); Prefs(this).envelopePinned = true; next() }
+            "uklid" -> {
+                Prefs(this).envelopePinned = true
+                paused = false
+                if (!pinMessages()) { awaiting = false; next() }
+                else {
+                    // Okénko „Přidat na plochu“: počkat, až ho člověk zavře (Přidat i Zrušit).
+                    // Pak se zavolá onResume a teprve tehdy se mluví další krok.
+                    // Kdyby se okénko vůbec neukázalo, po chvilce jít dál samo.
+                    window.decorView.postDelayed({
+                        if (awaiting && !paused && !isFinishing) { awaiting = false; next() }
+                    }, 2500)
+                }
+            }
             "perms" -> requestPermissions(perms(), 10)
             "sms" -> requestRole(RoleManager.ROLE_SMS)
             "calls" -> requestRole(RoleManager.ROLE_CALL_SCREENING)
@@ -288,8 +309,30 @@ class DnSetupActivity : Activity() {
             else -> true
         }
 
+        private val REQUIRED = listOf("perms", "sms", "calls", "overlay", "fullscreen", "chats")
+
+        /** Lidské názvy kroků pro obrazovku Pro rodinu. */
+        private val TITLES = mapOf(
+            "perms" to "Zprávy, hovory a upozornění",
+            "sms" to "Postaráno jako aplikace na zprávy",
+            "calls" to "Hlídání hovorů",
+            "overlay" to "Varování přes celou obrazovku při hovoru",
+            "fullscreen" to "Otázka po hovoru",
+            "chats" to "Hlídání WhatsAppu a Messengeru",
+        )
+
+        /** Co přesně chybí, aby ochrana byla celá. Prázdné = všechno zapnuté. */
+        fun missing(ctx: Context): List<String> {
+            val list = REQUIRED.filter { !isDone(ctx, it) }.map { TITLES.getValue(it) }.toMutableList()
+            if (permsGranted(ctx) && !GuardService.isRunning(ctx)) list += "Hlídání na pozadí se nespustilo (pomůže restart telefonu)"
+            return list
+        }
+
+        /** Chybí hlídání chatů (u aplikace stažené mimo Obchod Play ho Android často zamkne). */
+        fun chatsMissing(ctx: Context) = !isDone(ctx, "chats")
+
         /** Všechno potřebné je zapnuté. */
         fun allDone(ctx: Context) =
-            listOf("perms", "sms", "calls", "overlay", "fullscreen", "chats").all { isDone(ctx, it) } && GuardService.isRunning(ctx)
+            REQUIRED.all { isDone(ctx, it) } && GuardService.isRunning(ctx)
     }
 }

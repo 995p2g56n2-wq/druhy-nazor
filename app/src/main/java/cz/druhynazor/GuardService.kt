@@ -43,6 +43,7 @@ class GuardService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        alive = true
         Notify.setup(this)
         val tap = Notify.pending(this, Intent(this, MainActivity::class.java), 0)
         val n = Notification.Builder(this, Notify.CH_GUARD)
@@ -143,6 +144,7 @@ class GuardService : Service() {
     }
 
     override fun onDestroy() {
+        alive = false
         handler.removeCallbacks(longCall)
         val tm = telephony
         val cb = callback
@@ -168,7 +170,10 @@ class GuardService : Service() {
             }
         }
 
-        fun isRunning(context: Context): Boolean =
+        /** Hlídání běží v tomto procesu. Oznámení samo nestačí: na Androidu 14 ho jde odsunout prstem. */
+        @Volatile var alive = false
+
+        fun isRunning(context: Context): Boolean = alive ||
             context.getSystemService(NotificationManager::class.java)
                 .activeNotifications.any { it.id == Notify.ID_GUARD }
     }
