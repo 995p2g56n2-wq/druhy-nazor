@@ -69,7 +69,7 @@ class DnSetupActivity : Activity() {
             "V každém okénku pak ťukněte na Povolit."),
         Step("sms", "💬", "Zprávy přes Postaráno",
             "Zprávy budu otevírat já, abych podvod zachytila dřív než vy.",
-            "V okénku pak ťukněte na Postaráno a na Nastavit jako výchozí."),
+            "V okénku pak ťukněte na Postaráno a na Změnit na výchozí."),
         if (needsAppIcon) Step("uklid", "✉️", "Ikony na plochu",
             "Na plochu dám štít Postaráno a obálku Zprávy, která hlídá podvody.",
             "Ukážou se dvě okénka a v obou ťukněte na Přidat.")
@@ -122,7 +122,46 @@ class DnSetupActivity : Activity() {
     override fun onPause() {
         super.onPause()
         paused = true
-        speaker.stop()
+        // Nezastavovat hlas: právě říká, kam v okénku telefonu ťuknout.
+    }
+
+    /** Co přesně ťuknout v okénku telefonu. Ukáže se nahoře nad okénkem a řekne se nahlas, když se okénko otevře. */
+    private var dialogHint: String? = null
+
+    /**
+     * Pokyny do okénka telefonu: jeden pokyn = jedno ťuknutí, v pořadí.
+     * Okénko patří telefonu, takže nevíme, kdy přesně člověk ťukl. Proto pokyny říkáme
+     * po sobě s pauzou a po chvilce celé zopakujeme.
+     */
+    private fun dialogSteps(id: String): List<String> = when (id) {
+        "voice" -> listOf("Ťukněte u češtiny na Instalovat.", "Potom ťukněte dole na šipku zpět.")
+        "perms" -> listOf("Ťukněte na Povolit.", "Když se objeví další okénko, zase ťukněte na Povolit.")
+        "sms" -> listOf("Ťukněte na Postaráno.", "Teď ťukněte dole na Změnit na výchozí.")
+        "uklid" -> listOf("Ťukněte na Přidat.")
+        "calls" -> listOf("Ťukněte na Postaráno.", "Teď ťukněte na tlačítko vpravo dole.")
+        "overlay" -> listOf("Najděte v seznamu Postaráno a ťukněte na něj.", "Teď ťukněte na přepínač, aby svítil.")
+        "chats" -> listOf("Ťukněte na přepínač, aby svítil.", "Teď ťukněte na Povolit.")
+        else -> listOf("Ťukněte na Povolit.")
+    }
+
+    private val sayer = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /** Okénko telefonu se otevírá: nahoře velký pokyn a hned ho říct nahlas. */
+    private fun showDialogHint(id: String) {
+        val list = dialogSteps(id)
+        dialogHint = list.mapIndexed { i, t -> "${i + 1}.  $t" }.joinToString("\n\n")
+        render()
+        sayer.removeCallbacksAndMessages(null)
+        if (!Prefs(this).voiceOk) return
+        // Pokyny po jednom, s pauzou na ťuknutí; po chvilce celé ještě jednou
+        var at = 600L
+        repeat(2) {
+            for (t in list) {
+                sayer.postDelayed({ if (awaiting) speaker.say(t) }, at)
+                at += 4500
+            }
+            at += 6000
+        }
     }
 
     override fun onResume() {
@@ -136,12 +175,15 @@ class DnSetupActivity : Activity() {
     }
 
     override fun onDestroy() {
+        sayer.removeCallbacksAndMessages(null)
         speaker.stop()
         super.onDestroy()
     }
 
     /** Po návratu z okénka telefonu: povedlo se → další krok, jinak nabídnout znovu. */
     private fun evaluate() {
+        dialogHint = null
+        sayer.removeCallbacksAndMessages(null)
         if (!awaiting) return
         awaiting = false
         val step = todo.getOrNull(index) ?: return
@@ -165,6 +207,15 @@ class DnSetupActivity : Activity() {
     private fun render() {
         if (index >= todo.size) { setResult(RESULT_OK); finish(); return }
         val root = Ui.column(this, 20, 18).apply { setBackgroundColor(Ui.BG) }
+        val hint = dialogHint
+        if (awaiting && hint != null) {
+            // Okénko telefonu zakrývá spodek obrazovky: pokyn jen nahoře, velkým písmem
+            val box = Ui.card(this, 8).apply { background = Ui.rounded(Ui.ACCENT_SOFT, 18, this@DnSetupActivity) }
+            box.addView(Ui.text(this, hint, 28f, bold = true))
+            root.addView(box)
+            setContentView(ScrollView(this).apply { setBackgroundColor(Ui.BG); isFillViewport = true; addView(root) })
+            return
+        }
         when {
             index < 0 -> intro(root)
             else -> stepScreen(root, todo[index])
@@ -204,6 +255,7 @@ class DnSetupActivity : Activity() {
         }
         root.addView(sayBox(t))
         speakOnce(t)
+        root.addView(Ui.text(this, "👇", 44f, center = true))
         root.addView(Ui.button(this, "Dál") { next() })
     }
 
@@ -216,12 +268,15 @@ class DnSetupActivity : Activity() {
             root.addView(sayBox(t))
             speakOnce(t)
             step.note?.let { root.addView(Ui.text(this, it, 16f, color = Ui.MUTED)) }
+            root.addView(Ui.text(this, "👇", 44f, center = true))
             root.addView(Ui.button(this, "Zkusit znovu") { act(step) })
             root.addView(later { next() })
         } else {
-            val t = "${step.why} ${step.hint} Teď ťukněte dole na ${step.button}."
+            // Co ťuknout v okénku telefonu řekneme až ve chvíli, kdy se okénko otevře
+            val t = "${step.why} Pak vám řeknu, kam ťuknout. Teď ťukněte dole na ${step.button}."
             root.addView(sayBox(t))
             speakOnce(t)
+            root.addView(Ui.text(this, "👇", 44f, center = true))
             root.addView(Ui.button(this, step.button) { act(step) })
             if (step.id == "voice") {
                 root.addView(later("Ne, bez hlasu") { next() })
@@ -245,6 +300,7 @@ class DnSetupActivity : Activity() {
         paused = false
         awaiting = true
         if (!pin(what)) { pinNext(); return }
+        showDialogHint("uklid")
         // Po zavření okénka (Přidat i Zrušit) přijde onResume → evaluate → další okénko nebo krok.
         // Kdyby se okénko vůbec neukázalo, po chvilce jít dál samo.
         val token = ++pinToken
@@ -292,6 +348,8 @@ class DnSetupActivity : Activity() {
                 watchAndReturn(step.id)
             }
         }
+        // Otevřelo se okénko telefonu (u ikon na plochu to dělá pinNext)
+        if (awaiting && step.id != "uklid") showDialogHint(step.id)
     }
 
     private val watcher = android.os.Handler(android.os.Looper.getMainLooper())
