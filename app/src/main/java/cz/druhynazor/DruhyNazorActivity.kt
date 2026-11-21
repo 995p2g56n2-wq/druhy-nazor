@@ -71,6 +71,22 @@ class DruhyNazorActivity : Activity() {
             root.addView(setup)
         }
 
+        // ---- Schovat původní Zprávy (nepovinné, dělá rodina) ----
+        if (!prefs.uklidDone) {
+            val hide = Ui.card(this)
+            hide.addView(Ui.text(this, "Schovat původní Zprávy", 22f, bold = true))
+            hide.addView(Ui.text(this, "Nepovinné. Na ploše pak zůstane jen obálka Zprávy, která hlídá podvody. Postup:", 17f, color = Ui.MUTED))
+            hide.addView(Ui.text(this,
+                "1.  Ťukněte dole na tlačítko Domů.\n" +
+                "2.  Podržte prst na původní ikoně Zprávy.\n" +
+                "3.  Ťukněte na Odebrat. Pozor, ne Odinstalovat.\n" +
+                "4.  Vraťte se sem: ťukněte na ikonu Postaráno se štítem a dole na Pro rodinu.", 18f))
+            hide.addView(Ui.button(this, "Hotovo, je schovaná", Ui.CARD, Ui.ACCENT, sp = 18f) {
+                prefs.uklidDone = true; render()
+            })
+            root.addView(hide)
+        }
+
         root.addView(FamilyUi.card(this) { render() })
 
         // ---- Jak seniorovi říkají ----
