@@ -31,7 +31,7 @@ class DnSetupActivity : Activity() {
         val id: String,
         val icon: String,
         val title: String,
-        /** Proč to aplikace potřebuje. Čte se nahlas. */
+        /** Proč to potřebujeme. Čte se nahlas. */
         val why: String,
         /** Kam ťuknout v okénku telefonu. */
         val hint: String,
@@ -55,35 +55,39 @@ class DnSetupActivity : Activity() {
     @Suppress("DEPRECATION")
     private fun oldInstaller(): String? = packageManager.getInstallerPackageName(packageName)
 
+    /**
+     * Každý krok: proč (jedna věta), co udělat v okénku telefonu, a jako poslední věta
+     * vždy to, co udělat teď: „Teď ťukněte dole na …“. Nejvýš 3 věty, bez slova „aplikace“.
+     */
     private val steps by lazy { listOf(
         Step("voice", "🗣️", "Český hlas",
-            "Telefon zatím neumí mluvit česky. Mám nastavit český hlas?",
-            "Objeví se Obchod Play nebo nabídka hlasů. Ťukněte na Instalovat u češtiny a vraťte se šipkou zpět.",
+            "Telefon zatím neumí mluvit česky.",
+            "V okénku pak u češtiny ťukněte na Instalovat a vraťte se šipkou zpět.",
             button = "Ano, nastavit"),
-        Step("perms", "✉️", "Zprávy, hovory a upozornění",
-            "Aby aplikace viděla příchozí SMS a hovory a mohla vás včas varovat.",
-            "Objeví se několik okének. Pokaždé ťukněte na Povolit."),
-        Step("sms", "💬", "Aplikace na zprávy",
-            "SMS bude otevírat Postaráno místo aplikace Zprávy. Podvod tak zachytí dřív, než ho otevřete.",
-            "Ťukněte na Postaráno a potom na Nastavit jako výchozí."),
+        Step("perms", "✉️", "Zprávy a hovory",
+            "Smím hlídat vaše zprávy a hovory, abych vás včas varovala?",
+            "V každém okénku pak ťukněte na Povolit."),
+        Step("sms", "💬", "Zprávy přes Postaráno",
+            "Zprávy budu otevírat já, abych podvod zachytila dřív než vy.",
+            "V okénku pak ťukněte na Postaráno a na Nastavit jako výchozí."),
         if (needsAppIcon) Step("uklid", "✉️", "Ikony na plochu",
-            "Na plochu dáme štít Postaráno a obálku Zprávy. Obálka hlídá podvody.",
-            "Objeví se dvě okénka, jedno po druhém. Pokaždé ťukněte na Přidat.")
+            "Na plochu dám štít Postaráno a obálku Zprávy, která hlídá podvody.",
+            "Ukážou se dvě okénka a v obou ťukněte na Přidat.")
         else Step("uklid", "✉️", "Obálka na plochu",
-            "Na plochu dáme obálku Zprávy. Ta hlídá podvody.",
-            "Objeví se okénko. Ťukněte na Přidat."),
+            "Na plochu dám obálku Zprávy, která hlídá podvody.",
+            "V okénku pak ťukněte na Přidat."),
         Step("calls", "📞", "Hlídání hovorů",
-            "Aby aplikace poznala podezřelý hovor dřív, než ho zvednete.",
-            "Ťukněte na Postaráno a potvrďte."),
+            "Smím hlídat hovory, abych poznala podvodníka dřív, než zvednete?",
+            "V okénku pak ťukněte na Postaráno a potvrďte."),
         Step("overlay", "🚨", "Varování při hovoru",
-            "Když volá podvodník, přes celou obrazovku se ukáže velké červené varování.",
-            "Najděte Postaráno, zapněte přepínač a vraťte se šipkou zpět."),
+            "Když volá podvodník, ukážu přes celou obrazovku červené varování.",
+            "Pak najděte Postaráno, zapněte přepínač a vraťte se šipkou zpět."),
         Step("fullscreen", "❓", "Otázka po hovoru",
-            "Po delším hovoru s neznámým číslem se aplikace zeptá, jestli po vás někdo nechtěl peníze.",
-            "Zapněte přepínač u Postaráno a vraťte se šipkou zpět."),
+            "Po hovoru s neznámým číslem se zeptám, jestli po vás nechtěl peníze.",
+            "Pak zapněte přepínač u Postaráno a vraťte se šipkou zpět."),
         Step("chats", "🟢", "WhatsApp a Messenger",
-            "Aplikace zkontroluje i zprávy z WhatsAppu a Messengeru.",
-            "Najděte Postaráno, zapněte ho a vraťte se šipkou zpět.",
+            "Budu hlídat i WhatsApp a Messenger.",
+            "Pak najděte Postaráno, zapněte ho a vraťte se šipkou zpět.",
             note = "Je-li přepínač šedý („Omezené nastavení“): Nastavení → Aplikace → Postaráno → ⋮ vpravo nahoře → Povolit omezená nastavení. Pak to zkuste znovu."),
     ) }
 
@@ -195,9 +199,9 @@ class DnSetupActivity : Activity() {
         root.addView(Ui.text(this, "Zapneme ochranu", 30f, bold = true, center = true))
         val n = todo.size
         val t = when (n) {
-            1 -> "Zbývá jedna věc. Stačí ťuknout na velké tlačítko Dál."
-            in 2..4 -> "Zbývají $n věci. Projdeme je spolu, jednu po druhé. Stačí ťukat na velké tlačítko Dál."
-            else -> "Zbývá $n věcí. Projdeme je spolu, jednu po druhé. Stačí ťukat na velké tlačítko Dál."
+            1 -> "Zbývá jedna věc. Teď ťukněte dole na Dál."
+            in 2..4 -> "Zbývají $n věci, projdeme je spolu. Teď ťukněte dole na Dál."
+            else -> "Zbývá $n věcí, projdeme je spolu. Teď ťukněte dole na Dál."
         }
         root.addView(sayBox(t))
         speakOnce(t)
@@ -209,14 +213,14 @@ class DnSetupActivity : Activity() {
         root.addView(bigIcon(step.icon))
         root.addView(Ui.text(this, step.title, 28f, bold = true, center = true))
         if (failed) {
-            val t = "Ještě to není zapnuté. Zkusíme to znovu? ${step.hint}"
+            val t = "Ještě to není zapnuté. ${step.hint} Teď ťukněte dole na Zkusit znovu."
             root.addView(sayBox(t))
             speakOnce(t)
             step.note?.let { root.addView(Ui.text(this, it, 16f, color = Ui.MUTED)) }
             root.addView(Ui.button(this, "Zkusit znovu") { act(step) })
             root.addView(later { next() })
         } else {
-            val t = "${step.why} Teď se objeví okénko telefonu. ${step.hint}"
+            val t = "${step.why} ${step.hint} Teď ťukněte dole na ${step.button}."
             root.addView(sayBox(t))
             speakOnce(t)
             root.addView(Ui.button(this, step.button) { act(step) })
