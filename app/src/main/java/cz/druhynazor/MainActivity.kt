@@ -104,6 +104,7 @@ class MainActivity : Activity() {
         root.addView(Ui.text(this, "🛡️", 80f, center = true))
         root.addView(Ui.text(this, "Postaráno", 36f, bold = true, center = true))
         root.addView(Ui.text(this, "Ochrana před podvody.\nRodina je vždy v obraze.", 24f, bold = true, center = true))
+        root.addView(Ui.text(this, "Teď ťukněte dole na Zapnout ochranu.", 20f, center = true))
         spacer(root, 40)
         root.addView(Ui.button(this, "Zapnout ochranu", sp = 24f) {
             // Rodina se obnovila ze zálohy (nový telefon): rovnou na povolení
@@ -117,7 +118,7 @@ class MainActivity : Activity() {
         spacer(root, 16)
         root.addView(Ui.text(this, "👨‍👩‍👧", 72f, center = true))
         root.addView(Ui.text(this, "Komu dáme vědět, když se něco stane?", 28f, bold = true, center = true))
-        root.addView(Ui.text(this, "Vyberte někoho z rodiny. Nic nemusí instalovat, přijde mu jen SMS.", 20f, center = true))
+        root.addView(Ui.text(this, "Vyberte někoho z rodiny, přijde mu jen SMS. Teď ťukněte dole na Vybrat z kontaktů.", 20f, center = true))
         spacer(root, 16)
         root.addView(Ui.button(this, "Vybrat z kontaktů", sp = 22f) { FamilyUi.pick(this) })
         if (manualShown) {
@@ -133,7 +134,7 @@ class MainActivity : Activity() {
         val prefs = Prefs(this)
         spacer(root, 16)
         root.addView(Ui.text(this, "Jak vám ${prefs.familyFirstName} říká?", 28f, bold = true, center = true))
-        root.addView(Ui.text(this, "Podle toho mu budeme psát.", 20f, center = true, color = Ui.MUTED))
+        root.addView(Ui.text(this, "Podle toho mu budu psát. Teď ťukněte na jedno z tlačítek.", 20f, center = true, color = Ui.MUTED))
         for ((label, name) in Prefs.CALLS) {
             root.addView(Ui.button(this, label, Ui.CARD, Ui.INK, sp = 24f) { chooseCall(name) })
         }
@@ -178,10 +179,11 @@ class MainActivity : Activity() {
         spacer(root, 40)
         root.addView(Ui.text(this, if (ok) "✅" else "⚠️", 80f, center = true))
         val lines = if (ok) {
-            listOfNotNull("Hotovo.", "Jste chránění.",
-                if (prefs.testSent && family.isNotEmpty()) "${prefs.familyFirstName} už má zkušební zprávu." else null)
+            listOfNotNull("Hotovo, jste chránění.",
+                if (prefs.testSent && family.isNotEmpty()) "${prefs.familyFirstName} už má zkušební zprávu." else null,
+                "Teď ťukněte dole na Hotovo.")
         } else {
-            listOf("Skoro hotovo.", "Ochrana ještě není celá zapnutá.", "Ťukněte na Dokončit.")
+            listOf("Skoro hotovo.", "Ochrana ještě není celá zapnutá.", "Teď ťukněte dole na Dokončit.")
         }
         root.addView(Ui.text(this, lines[0], 36f, bold = true, center = true, color = if (ok) Ui.OK else Ui.WARN))
         lines.drop(1).forEach { root.addView(Ui.text(this, it, 24f, center = true)) }

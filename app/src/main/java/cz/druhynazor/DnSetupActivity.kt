@@ -31,7 +31,7 @@ class DnSetupActivity : Activity() {
         val id: String,
         val icon: String,
         val title: String,
-        /** Proč to aplikace potřebuje. Čte se nahlas. */
+        /** Proč to potřebujeme. Čte se nahlas. */
         val why: String,
         /** Kam ťuknout v okénku telefonu. */
         val hint: String,
@@ -40,34 +40,56 @@ class DnSetupActivity : Activity() {
         val button: String = "Dál",
     )
 
-    private val steps = listOf(
+    /**
+     * Aplikace stažená mimo Obchod Play nedostane na Samsungu ikonu na plochu sama.
+     * Pak ji dáme na plochu my, spolu s obálkou Zprávy.
+     */
+    private val needsAppIcon by lazy {
+        val src = try {
+            if (Build.VERSION.SDK_INT >= 30) packageManager.getInstallSourceInfo(packageName).installingPackageName
+            else oldInstaller()
+        } catch (e: Exception) { null }
+        src != "com.android.vending"
+    }
+
+    @Suppress("DEPRECATION")
+    private fun oldInstaller(): String? = packageManager.getInstallerPackageName(packageName)
+
+    /**
+     * Každý krok: proč (jedna věta), co udělat v okénku telefonu, a jako poslední věta
+     * vždy to, co udělat teď: „Teď ťukněte dole na …“. Nejvýš 3 věty, bez slova „aplikace“.
+     */
+    private val steps by lazy { listOf(
         Step("voice", "🗣️", "Český hlas",
-            "Telefon zatím neumí mluvit česky. Mám nastavit český hlas?",
-            "Objeví se Obchod Play nebo nabídka hlasů. Ťukněte na Instalovat u češtiny a vraťte se šipkou zpět.",
+            "Telefon zatím neumí mluvit česky.",
+            "V okénku pak u češtiny ťukněte na Instalovat a vraťte se šipkou zpět.",
             button = "Ano, nastavit"),
-        Step("perms", "✉️", "Zprávy, hovory a upozornění",
-            "Aby aplikace viděla příchozí SMS a hovory a mohla vás včas varovat.",
-            "Objeví se několik okének. Pokaždé ťukněte na Povolit."),
-        Step("sms", "💬", "Aplikace na zprávy",
-            "SMS bude otevírat Postaráno místo aplikace Zprávy. Podvod tak zachytí dřív, než ho otevřete.",
-            "Ťukněte na Postaráno a potom na Nastavit jako výchozí."),
-        Step("uklid", "✉️", "Jedny Zprávy",
-            "Na plochu dáme obálku Zprávy. Ta hlídá podvody.",
-            "Objeví se okénko. Ťukněte na Přidat."),
+        Step("perms", "✉️", "Zprávy a hovory",
+            "Smím hlídat vaše zprávy a hovory, abych vás včas varovala?",
+            "V každém okénku pak ťukněte na Povolit."),
+        Step("sms", "💬", "Zprávy přes Postaráno",
+            "Zprávy budu otevírat já, abych podvod zachytila dřív než vy.",
+            "V okénku pak ťukněte na Postaráno a na Nastavit jako výchozí."),
+        if (needsAppIcon) Step("uklid", "✉️", "Ikony na plochu",
+            "Na plochu dám štít Postaráno a obálku Zprávy, která hlídá podvody.",
+            "Ukážou se dvě okénka a v obou ťukněte na Přidat.")
+        else Step("uklid", "✉️", "Obálka na plochu",
+            "Na plochu dám obálku Zprávy, která hlídá podvody.",
+            "V okénku pak ťukněte na Přidat."),
         Step("calls", "📞", "Hlídání hovorů",
-            "Aby aplikace poznala podezřelý hovor dřív, než ho zvednete.",
-            "Ťukněte na Postaráno a potvrďte."),
+            "Smím hlídat hovory, abych poznala podvodníka dřív, než zvednete?",
+            "V okénku pak ťukněte na Postaráno a potvrďte."),
         Step("overlay", "🚨", "Varování při hovoru",
-            "Když volá podvodník, přes celou obrazovku se ukáže velké červené varování.",
-            "Najděte Postaráno, zapněte přepínač a vraťte se šipkou zpět."),
+            "Když volá podvodník, ukážu přes celou obrazovku červené varování.",
+            "Pak najděte Postaráno, zapněte přepínač a vraťte se šipkou zpět."),
         Step("fullscreen", "❓", "Otázka po hovoru",
-            "Po delším hovoru s neznámým číslem se aplikace zeptá, jestli po vás někdo nechtěl peníze.",
-            "Zapněte přepínač u Postaráno a vraťte se šipkou zpět."),
+            "Po hovoru s neznámým číslem se zeptám, jestli po vás nechtěl peníze.",
+            "Pak zapněte přepínač u Postaráno a vraťte se šipkou zpět."),
         Step("chats", "🟢", "WhatsApp a Messenger",
-            "Aplikace zkontroluje i zprávy z WhatsAppu a Messengeru.",
-            "Najděte Postaráno, zapněte ho a vraťte se šipkou zpět.",
+            "Budu hlídat i WhatsApp a Messenger.",
+            "Pak najděte Postaráno, zapněte ho a vraťte se šipkou zpět.",
             note = "Je-li přepínač šedý („Omezené nastavení“): Nastavení → Aplikace → Postaráno → ⋮ vpravo nahoře → Povolit omezená nastavení. Pak to zkuste znovu."),
-    )
+    ) }
 
     /** Kroky, které na začátku průvodce ještě nebyly hotové. */
     private lateinit var todo: List<Step>
@@ -124,6 +146,8 @@ class DnSetupActivity : Activity() {
         if (!awaiting) return
         awaiting = false
         val step = todo.getOrNull(index) ?: return
+        // Zavřelo se okénko „Přidat na plochu“: další okénko, nebo další krok
+        if (step.id == "uklid") { pinNext(); return }
         if (step.id == "voice") {
             // Hlas se kontroluje chvilku, výsledek přijde později
             Voice.check(this) { ok ->
@@ -151,6 +175,8 @@ class DnSetupActivity : Activity() {
 
     private fun speakOnce(text: String) {
         if (spokenFor == index) return
+        // Čeká se na okénko telefonu: nemluvit do něj
+        if (awaiting) return
         // Bez českého hlasu by telefon četl česky anglickým hlasem
         if (!Prefs(this).voiceOk) return
         spokenFor = index
@@ -173,9 +199,9 @@ class DnSetupActivity : Activity() {
         root.addView(Ui.text(this, "Zapneme ochranu", 30f, bold = true, center = true))
         val n = todo.size
         val t = when (n) {
-            1 -> "Zbývá jedna věc. Stačí ťuknout na velké tlačítko Dál."
-            in 2..4 -> "Zbývají $n věci. Projdeme je spolu, jednu po druhé. Stačí ťukat na velké tlačítko Dál."
-            else -> "Zbývá $n věcí. Projdeme je spolu, jednu po druhé. Stačí ťukat na velké tlačítko Dál."
+            1 -> "Zbývá jedna věc. Teď ťukněte dole na Dál."
+            in 2..4 -> "Zbývají $n věci, projdeme je spolu. Teď ťukněte dole na Dál."
+            else -> "Zbývá $n věcí, projdeme je spolu. Teď ťukněte dole na Dál."
         }
         root.addView(sayBox(t))
         speakOnce(t)
@@ -187,14 +213,14 @@ class DnSetupActivity : Activity() {
         root.addView(bigIcon(step.icon))
         root.addView(Ui.text(this, step.title, 28f, bold = true, center = true))
         if (failed) {
-            val t = "Ještě to není zapnuté. Zkusíme to znovu? ${step.hint}"
+            val t = "Ještě to není zapnuté. ${step.hint} Teď ťukněte dole na Zkusit znovu."
             root.addView(sayBox(t))
             speakOnce(t)
             step.note?.let { root.addView(Ui.text(this, it, 16f, color = Ui.MUTED)) }
             root.addView(Ui.button(this, "Zkusit znovu") { act(step) })
             root.addView(later { next() })
         } else {
-            val t = "${step.why} Teď se objeví okénko telefonu. ${step.hint}"
+            val t = "${step.why} ${step.hint} Teď ťukněte dole na ${step.button}."
             root.addView(sayBox(t))
             speakOnce(t)
             root.addView(Ui.button(this, step.button) { act(step) })
@@ -208,20 +234,27 @@ class DnSetupActivity : Activity() {
     private fun later(label: String = "Později", onClick: () -> Unit) =
         Ui.button(this, label, Ui.BG, Ui.MUTED, sp = 16f) { onClick() }
 
-    /** Dá na plochu obálku Zprávy, která otevře naše zprávy. */
-    private fun pinMessages(): Boolean {
-        val sm = getSystemService(ShortcutManager::class.java) ?: return false
-        if (!sm.isRequestPinShortcutSupported) return false
-        val open = Intent(this, DruhyNazorActivity::class.java)
-            .setAction(Intent.ACTION_VIEW)
-            .putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true)
-        val info = ShortcutInfo.Builder(this, "zpravy")
-            .setShortLabel("Zprávy")
-            .setIcon(Icon.createWithResource(this, R.drawable.ic_envelope))
-            .setIntent(open)
-            .build()
-        return try { sm.requestPinShortcut(info, null) } catch (e: Exception) { false }
+    /** Co ještě dát na plochu: "app" = štít Postaráno, "zpravy" = obálka Zprávy. */
+    private val pinQueue = ArrayDeque<String>()
+    /** Číslo posledního okénka, aby starý odpočet neposunul průvodce u dalšího okénka. */
+    private var pinToken = 0
+
+    /** Ukáže další okénko „Přidat na plochu“ a počká, až ho člověk zavře. Nakonec jde na další krok. */
+    private fun pinNext() {
+        val what = pinQueue.removeFirstOrNull()
+        if (what == null) { awaiting = false; next(); return }
+        paused = false
+        awaiting = true
+        if (!pin(what)) { pinNext(); return }
+        // Po zavření okénka (Přidat i Zrušit) přijde onResume → evaluate → další okénko nebo krok.
+        // Kdyby se okénko vůbec neukázalo, po chvilce jít dál samo.
+        val token = ++pinToken
+        window.decorView.postDelayed({
+            if (token == pinToken && awaiting && !paused && !isFinishing) pinNext()
+        }, 2500)
     }
+
+    private fun pin(what: String): Boolean = pinShortcut(this, what)
 
     private fun act(step: Step) {
         speaker.stop()
@@ -233,16 +266,10 @@ class DnSetupActivity : Activity() {
             // později podle návodu v Pro rodinu (senior by se z plochy zpátky nevrátil).
             "uklid" -> {
                 Prefs(this).envelopePinned = true
-                paused = false
-                if (!pinMessages()) { awaiting = false; next() }
-                else {
-                    // Okénko „Přidat na plochu“: počkat, až ho člověk zavře (Přidat i Zrušit).
-                    // Pak se zavolá onResume a teprve tehdy se mluví další krok.
-                    // Kdyby se okénko vůbec neukázalo, po chvilce jít dál samo.
-                    window.decorView.postDelayed({
-                        if (awaiting && !paused && !isFinishing) { awaiting = false; next() }
-                    }, 2500)
-                }
+                pinQueue.clear()
+                if (needsAppIcon) pinQueue.addLast("app")
+                pinQueue.addLast("zpravy")
+                pinNext()
             }
             "perms" -> requestPermissions(perms(), 10)
             "sms" -> requestRole(RoleManager.ROLE_SMS)
@@ -281,6 +308,28 @@ class DnSetupActivity : Activity() {
     }
 
     companion object {
+        /** Dá na plochu štít Postaráno nebo obálku Zprávy. */
+        fun pinShortcut(ctx: Context, what: String): Boolean {
+            val sm = ctx.getSystemService(ShortcutManager::class.java) ?: return false
+            if (!sm.isRequestPinShortcutSupported) return false
+            val info = if (what == "app") {
+                ShortcutInfo.Builder(ctx, "postarano")
+                    .setShortLabel("Postaráno")
+                    .setIcon(Icon.createWithResource(ctx, R.drawable.ic_shield))
+                    .setIntent(Intent(ctx, MainActivity::class.java).setAction(Intent.ACTION_MAIN))
+                    .build()
+            } else {
+                ShortcutInfo.Builder(ctx, "zpravy")
+                    .setShortLabel("Zprávy")
+                    .setIcon(Icon.createWithResource(ctx, R.drawable.ic_envelope))
+                    .setIntent(Intent(ctx, DruhyNazorActivity::class.java)
+                        .setAction(Intent.ACTION_VIEW)
+                        .putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true))
+                    .build()
+            }
+            return try { sm.requestPinShortcut(info, null) } catch (e: Exception) { false }
+        }
+
         fun perms(): Array<String> {
             val list = mutableListOf(
                 Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS, Manifest.permission.SEND_SMS,
