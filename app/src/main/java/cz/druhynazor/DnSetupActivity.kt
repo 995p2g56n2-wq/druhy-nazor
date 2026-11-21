@@ -62,29 +62,29 @@ class DnSetupActivity : Activity() {
     private val steps by lazy { listOf(
         Step("voice", "🗣️", "Český hlas",
             "Telefon zatím neumí mluvit česky.",
-            "V okénku pak u češtiny ťukněte na Instalovat a vraťte se šipkou zpět.",
+            "V okénku pak u češtiny stiskněte Instalovat a vraťte se šipkou vlevo nahoře.",
             button = "Ano, nastavit"),
         Step("perms", "✉️", "Zprávy a hovory",
             "Smím hlídat vaše zprávy a hovory, abych vás včas varovala?",
-            "V každém okénku pak ťukněte na Povolit."),
+            "V každém okénku pak stiskněte Povolit."),
         Step("sms", "💬", "Zprávy přes Postaráno",
             "Zprávy budu otevírat já, abych podvod zachytila dřív než vy.",
-            "V okénku pak ťukněte na Postaráno a na Změnit na výchozí."),
+            "V okénku pak vyberte Postaráno a stiskněte Změnit na výchozí."),
         if (needsAppIcon) Step("uklid", "✉️", "Ikony na plochu",
             "Na plochu dám štít Postaráno a obálku Zprávy, která hlídá podvody.",
-            "Ukážou se dvě okénka a v obou ťukněte na Přidat.")
+            "Ukážou se dvě okénka a v obou zmáčkněte Přidat.")
         else Step("uklid", "✉️", "Obálka na plochu",
             "Na plochu dám obálku Zprávy, která hlídá podvody.",
-            "V okénku pak ťukněte na Přidat."),
+            "V okénku pak zmáčkněte Přidat."),
         Step("calls", "📞", "Hlídání hovorů",
             "Smím hlídat hovory, abych poznala podvodníka dřív, než zvednete?",
-            "V okénku pak ťukněte na Postaráno a potvrďte."),
+            "V okénku pak vyberte Postaráno a potvrďte."),
         Step("overlay", "🚨", "Varování při hovoru",
             "Když volá podvodník, ukážu přes celou obrazovku červené varování.",
-            "V seznamu pak najděte Postaráno a zapněte přepínač. Sem se vrátím sám."),
+            "V seznamu pak najděte Postaráno a zapněte přepínač. Pak zmáčkněte šipku vlevo nahoře."),
         Step("chats", "🟢", "WhatsApp a Messenger",
             "Budu hlídat i WhatsApp a Messenger.",
-            "Pak zapněte přepínač a potvrďte Povolit. Sem se vrátím sám.",
+            "Pak zapněte přepínač a potvrďte Povolit. Nakonec zmáčkněte šipku vlevo nahoře.",
             note = "Je-li přepínač šedý („Omezené nastavení“): Nastavení → Aplikace → Postaráno → ⋮ vpravo nahoře → Povolit omezená nastavení. Pak to zkuste znovu."),
     ) }
 
@@ -134,14 +134,16 @@ class DnSetupActivity : Activity() {
      * po sobě s pauzou a po chvilce celé zopakujeme.
      */
     private fun dialogSteps(id: String): List<String> = when (id) {
-        "voice" -> listOf("Ťukněte u češtiny na Instalovat.", "Potom ťukněte dole na šipku zpět.")
-        "perms" -> listOf("Ťukněte na Povolit.", "Když se objeví další okénko, zase ťukněte na Povolit.")
-        "sms" -> listOf("Ťukněte na Postaráno.", "Teď ťukněte dole na Změnit na výchozí.")
-        "uklid" -> listOf("Ťukněte na Přidat.")
-        "calls" -> listOf("Ťukněte na Postaráno.", "Teď ťukněte na tlačítko vpravo dole.")
-        "overlay" -> listOf("Najděte v seznamu Postaráno a ťukněte na něj.", "Teď ťukněte na přepínač, aby svítil.")
-        "chats" -> listOf("Ťukněte na přepínač, aby svítil.", "Teď ťukněte na Povolit.")
-        else -> listOf("Ťukněte na Povolit.")
+        // Slovesa se střídají (ťukněte, stiskněte, zmáčkněte, vyberte), ať to nezní pořád stejně.
+        // Po přepínači v nastavení telefonu vždy vyvést ven šipkou vlevo nahoře.
+        "voice" -> listOf("U češtiny stiskněte Instalovat.", "Potom zmáčkněte šipku vlevo nahoře.")
+        "perms" -> listOf("Stiskněte Povolit.", "Když se objeví další okénko, zase zmáčkněte Povolit.")
+        "sms" -> listOf("Vyberte Postaráno.", "Teď stiskněte dole Změnit na výchozí.")
+        "uklid" -> listOf("Zmáčkněte Přidat.")
+        "calls" -> listOf("Vyberte Postaráno.", "Teď stiskněte tlačítko vpravo dole.")
+        "overlay" -> listOf("Najděte v seznamu Postaráno a ťukněte na něj.", "Teď zapněte přepínač, aby svítil.", "Nakonec zmáčkněte šipku vlevo nahoře.")
+        "chats" -> listOf("Zapněte přepínač, aby svítil.", "Teď stiskněte Povolit.", "Nakonec zmáčkněte šipku vlevo nahoře.")
+        else -> listOf("Stiskněte Povolit.")
     }
 
     private val sayer = android.os.Handler(android.os.Looper.getMainLooper())
@@ -264,7 +266,7 @@ class DnSetupActivity : Activity() {
         root.addView(bigIcon(step.icon))
         root.addView(Ui.text(this, step.title, 28f, bold = true, center = true))
         if (failed) {
-            val t = "Ještě to není zapnuté. ${step.hint} Teď ťukněte dole na Zkusit znovu."
+            val t = "Ještě to není zapnuté. ${step.hint} Teď zmáčkněte dole Zkusit znovu."
             root.addView(sayBox(t))
             speakOnce(t)
             step.note?.let { root.addView(Ui.text(this, it, 16f, color = Ui.MUTED)) }
@@ -273,7 +275,8 @@ class DnSetupActivity : Activity() {
             root.addView(later { next() })
         } else {
             // Co ťuknout v okénku telefonu řekneme až ve chvíli, kdy se okénko otevře
-            val t = "${step.why} Pak vám řeknu, kam ťuknout. Teď ťukněte dole na ${step.button}."
+            val press = listOf("ťukněte dole na", "stiskněte dole tlačítko", "zmáčkněte dole tlačítko")[index.coerceAtLeast(0) % 3]
+            val t = "${step.why} Pak vám řeknu, co dál. Teď $press ${step.button}."
             root.addView(sayBox(t))
             speakOnce(t)
             root.addView(Ui.text(this, "👇", 44f, center = true))

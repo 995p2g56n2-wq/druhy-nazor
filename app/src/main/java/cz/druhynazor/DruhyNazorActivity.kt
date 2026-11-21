@@ -97,7 +97,7 @@ class DruhyNazorActivity : Activity() {
             hide.addView(Ui.text(this,
                 "1.  Ťukněte dole na tlačítko Domů.\n" +
                 "2.  Podržte prst na původní ikoně Zprávy. To je ta s bublinou, ne naše obálka ✉️.\n" +
-                "3.  Ťukněte na Odebrat. Pozor, ne Odinstalovat.\n" +
+                "3.  Stiskněte Odebrat. Pozor, ne Odinstalovat.\n" +
                 "4.  Vraťte se sem: ťukněte na ikonu Postaráno se štítem a dole na Pro rodinu.", 18f))
             hide.addView(Ui.button(this, "Hotovo, je schovaná", Ui.CARD, Ui.ACCENT, sp = 18f) {
                 prefs.uklidDone = true; render()
