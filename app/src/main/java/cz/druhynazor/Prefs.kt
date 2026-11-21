@@ -67,6 +67,11 @@ class Prefs(context: Context) {
         get() = d.getBoolean("uklid_done", false)
         set(v) = d.edit().putBoolean("uklid_done", v).apply()
 
+    /** Na ploše je naše obálka Zprávy. */
+    var envelopePinned: Boolean
+        get() = d.getBoolean("envelope_pinned", false)
+        set(v) = d.edit().putBoolean("envelope_pinned", v).apply()
+
     /** Rodině už odešla zkušební zpráva na konci nastavení. */
     var testSent: Boolean
         get() = p.getBoolean("test_sent", false)

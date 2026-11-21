@@ -52,7 +52,7 @@ class DnSetupActivity : Activity() {
             "SMS bude otevírat Postaráno místo aplikace Zprávy. Podvod tak zachytí dřív, než ho otevřete.",
             "Ťukněte na Postaráno a potom na Nastavit jako výchozí."),
         Step("uklid", "✉️", "Jedny Zprávy",
-            "Na plochu dáme novou obálku Zprávy. Ta hlídá podvody. Původní Zprávy pak z plochy schováme, aby se nepletly.",
+            "Na plochu dáme obálku Zprávy. Ta hlídá podvody.",
             "Objeví se okénko. Ťukněte na Přidat."),
         Step("calls", "📞", "Hlídání hovorů",
             "Aby aplikace poznala podezřelý hovor dřív, než ho zvednete.",
@@ -77,8 +77,6 @@ class DnSetupActivity : Activity() {
     private var failed = false
     private var spokenFor = Int.MIN_VALUE
     private var ready = false
-    /** Krok Zprávy: obálka už je na ploše, teď schovat původní ikonu. */
-    private var uklidPinned = false
     private lateinit var speaker: Speaker
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -176,7 +174,6 @@ class DnSetupActivity : Activity() {
     }
 
     private fun stepScreen(root: LinearLayout, step: Step) {
-        if (step.id == "uklid" && uklidPinned) { uklidScreen(root); return }
         root.addView(Ui.text(this, "Nastavení ${index + 1} z ${todo.size}", 17f, color = Ui.MUTED))
         root.addView(bigIcon(step.icon))
         root.addView(Ui.text(this, step.title, 28f, bold = true, center = true))
@@ -196,22 +193,6 @@ class DnSetupActivity : Activity() {
                 root.addView(later("Ne, bez hlasu") { next() })
             }
         }
-    }
-
-    /** Druhá půlka kroku Zprávy: schovat původní ikonu z plochy. Aplikace to sama neumí. */
-    private fun uklidScreen(root: LinearLayout) {
-        root.addView(Ui.text(this, "Nastavení ${index + 1} z ${todo.size}", 17f, color = Ui.MUTED))
-        root.addView(bigIcon("✉️"))
-        root.addView(Ui.text(this, "Schovat původní Zprávy", 28f, bold = true, center = true))
-        val t = "Na ploše podržte prst na staré ikoně Zprávy. Ťukněte na Odebrat. Nic se nesmaže, ikona jen zmizí z plochy."
-        root.addView(sayBox(t))
-        speakOnce(t)
-        root.addView(Ui.button(this, "Hotovo, je schovaná") {
-            Prefs(this).uklidDone = true
-            uklidPinned = false
-            next()
-        })
-        root.addView(later { uklidPinned = false; next() })
     }
 
     /** Malé nenápadné tlačítko dole. Hlavní cesta je vždy velké tlačítko nad ním. */
@@ -239,7 +220,9 @@ class DnSetupActivity : Activity() {
         spokenFor = Int.MIN_VALUE
         when (step.id) {
             "voice" -> Voice.fix(this)
-            "uklid" -> { awaiting = false; pinMessages(); uklidPinned = true; render() }
+            // Jen obálka na plochu. Schování původních Zpráv je mimo aplikaci, to udělá rodina
+            // později podle návodu v Pro rodinu (senior by se z plochy zpátky nevrátil).
+            "uklid" -> { awaiting = false; pinMessages(); Prefs(this).envelopePinned = true; next() }
             "perms" -> requestPermissions(perms(), 10)
             "sms" -> requestRole(RoleManager.ROLE_SMS)
             "calls" -> requestRole(RoleManager.ROLE_CALL_SCREENING)
@@ -301,7 +284,7 @@ class DnSetupActivity : Activity() {
             "fullscreen" -> Build.VERSION.SDK_INT < 34 || ctx.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
             "chats" -> !ChatWatcher.anyChatInstalled(ctx) || ChatWatcher.isEnabled(ctx)
             "voice" -> Prefs(ctx).voiceOk
-            "uklid" -> Prefs(ctx).uklidDone
+            "uklid" -> Prefs(ctx).envelopePinned || Prefs(ctx).uklidDone
             else -> true
         }
 
