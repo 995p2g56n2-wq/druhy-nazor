@@ -215,7 +215,7 @@ class DruhyNazorActivity : Activity() {
     private fun messageRow(sms: Sms): View {
         val fromFamily = Prefs(this).familyByNumber(sms.address) != null
         val checked = if (!sms.incoming) null
-            else if (fromFamily) ScamCheck.Result(ScamCheck.Level.OK, "", emptyList()) else ScamCheck.check(sms.body)
+            else if (fromFamily) ScamCheck.Result(ScamCheck.Level.OK, "", emptyList()) else TrustedSenders.check(this, sms.body, sms.address)
         // Rozhodnutí rodiny má přednost před automatickou kontrolou
         val result = when (if (sms.incoming) Verdicts.get(this, Verdicts.keyForSms(sms.id)) else null) {
             Verdicts.Verdict.OK -> ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())
@@ -238,7 +238,7 @@ class DruhyNazorActivity : Activity() {
         val label = when (result?.level) {
             ScamCheck.Level.SCAM -> "⚠️ PODVOD · "
             ScamCheck.Level.WARN -> "⚠️ POZOR · "
-            ScamCheck.Level.OK -> ""
+            ScamCheck.Level.OK -> if (result.promo) "Reklama · " else ""
             null -> "Odesláno · "
         }
         col.addView(Ui.text(this, label + sms.address, 17f, bold = true,

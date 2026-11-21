@@ -47,7 +47,7 @@ class MessageActivity : Activity() {
         val verdict = if (incoming && !fromFamily) Verdicts.get(this, key) else null
 
         if (body.isNotEmpty()) {
-            val result = if (incoming && !fromFamily) ScamCheck.check(body) else ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())
+            val result = if (incoming && !fromFamily) TrustedSenders.check(this, body, address) else ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())
             if (incoming) {
                 val family = Verdicts.decidedBy(this, key) ?: prefs.familyName
                 val (c, head, advice, extra) = when {
@@ -59,7 +59,8 @@ class MessageActivity : Activity() {
                         ScamCheck.advice(result.level), "${result.reason}\nČekáme, až to $family zkontroluje.")
                     result.level == ScamCheck.Level.SCAM -> Banner(Ui.color(result.level), ScamCheck.headline(result.level),
                         ScamCheck.advice(result.level), "${result.reason}\n$family už o tom ví.")
-                    else -> Banner(Ui.color(result.level), ScamCheck.headline(result.level), ScamCheck.advice(result.level), "")
+                    else -> Banner(Ui.color(result.level), ScamCheck.headline(result.level), ScamCheck.advice(result.level),
+                        if (result.promo) result.reason else "")
                 }
                 val banner = Ui.column(this, 20, 8).apply { background = Ui.rounded(c, 22, this@MessageActivity) }
                 banner.addView(Ui.text(this, head, 34f, bold = true, color = Color.WHITE))

@@ -72,6 +72,9 @@ object Verdicts {
 
         val prefsMain = Prefs(ctx)
         val ok = verdict == Verdict.OK
+        // Rodina schválila SMS od odesílatele se jménem: příště už jeho reklamu nehlásit
+        if (ok && key.startsWith("s")) key.drop(1).toLongOrNull()?.let { SmsStore.byId(ctx, it) }
+            ?.let { TrustedSenders.learn(ctx, it.address, it.body) }
         val who = byName ?: prefsMain.familyName
         val tap = Intent(ctx, DruhyNazorActivity::class.java)
             .putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true)
