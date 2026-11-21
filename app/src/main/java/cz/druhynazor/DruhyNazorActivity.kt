@@ -64,7 +64,13 @@ class DruhyNazorActivity : Activity() {
         } else {
             val setup = Ui.card(this).apply { background = Ui.rounded(Ui.WARN_SOFT, 20, this@DruhyNazorActivity) }
             setup.addView(Ui.text(this, "Ochrana není celá zapnutá", 22f, bold = true, color = Ui.WARN))
-            setup.addView(Ui.text(this, "Ťukněte na Dokončit nastavení a projděte zbývající kroky.", 17f))
+            setup.addView(Ui.text(this, "Chybí:", 17f, bold = true))
+            setup.addView(Ui.text(this, DnSetupActivity.missing(this).joinToString("\n") { "•  $it" }, 18f))
+            if (DnSetupActivity.chatsMissing(this)) {
+                setup.addView(Ui.text(this,
+                    "Když je u WhatsAppu přepínač šedý: otevřete Nastavení telefonu → Aplikace → Postaráno → " +
+                    "tři tečky vpravo nahoře → Povolit omezená nastavení. Pak znovu Dokončit nastavení.", 16f, color = Ui.MUTED))
+            }
             setup.addView(Ui.button(this, "Dokončit nastavení", Ui.WARN) {
                 startActivity(Intent(this, DnSetupActivity::class.java))
             })

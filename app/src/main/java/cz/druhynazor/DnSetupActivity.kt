@@ -288,8 +288,30 @@ class DnSetupActivity : Activity() {
             else -> true
         }
 
+        private val REQUIRED = listOf("perms", "sms", "calls", "overlay", "fullscreen", "chats")
+
+        /** Lidské názvy kroků pro obrazovku Pro rodinu. */
+        private val TITLES = mapOf(
+            "perms" to "Zprávy, hovory a upozornění",
+            "sms" to "Postaráno jako aplikace na zprávy",
+            "calls" to "Hlídání hovorů",
+            "overlay" to "Varování přes celou obrazovku při hovoru",
+            "fullscreen" to "Otázka po hovoru",
+            "chats" to "Hlídání WhatsAppu a Messengeru",
+        )
+
+        /** Co přesně chybí, aby ochrana byla celá. Prázdné = všechno zapnuté. */
+        fun missing(ctx: Context): List<String> {
+            val list = REQUIRED.filter { !isDone(ctx, it) }.map { TITLES.getValue(it) }.toMutableList()
+            if (permsGranted(ctx) && !GuardService.isRunning(ctx)) list += "Hlídání na pozadí se nespustilo (pomůže restart telefonu)"
+            return list
+        }
+
+        /** Chybí hlídání chatů (u aplikace stažené mimo Obchod Play ho Android často zamkne). */
+        fun chatsMissing(ctx: Context) = !isDone(ctx, "chats")
+
         /** Všechno potřebné je zapnuté. */
         fun allDone(ctx: Context) =
-            listOf("perms", "sms", "calls", "overlay", "fullscreen", "chats").all { isDone(ctx, it) } && GuardService.isRunning(ctx)
+            REQUIRED.all { isDone(ctx, it) } && GuardService.isRunning(ctx)
     }
 }
