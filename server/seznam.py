@@ -194,6 +194,37 @@ def phish_bin(hosts) -> bytes:
     return b"".join(prefixes)
 
 
+CHANGE_DAYS = 30
+
+
+def write_change(folder: str, pub: dict, prev, today: str, old: bytes, new: bytes):
+    """
+    Přírůstek za den, aby telefon nemusel každý den stahovat celé 2 MB (i bez Wi-Fi):
+    zmeny/<den>.bin = 4 bajty počet přidaných, přidané otisky, odebrané otisky (po 5 bajtech).
+    Řetěz v info.json říká, ze které verze na kterou se přírůstek použije.
+    """
+    zdir = os.path.join(folder, "zmeny")
+    os.makedirs(zdir, exist_ok=True)
+    chain = [c for c in pub.get("phish_retez", []) if c["den"] != today]
+    if prev and old and prev != today:
+        a = {old[i:i + 5] for i in range(0, len(old), 5)}
+        b = {new[i:i + 5] for i in range(0, len(new), 5)}
+        plus, minus = sorted(b - a), sorted(a - b)
+        with open(os.path.join(zdir, today + ".bin"), "wb") as f:
+            f.write(len(plus).to_bytes(4, "big") + b"".join(plus) + b"".join(minus))
+        chain.append({"den": today, "z": prev, "plus": len(plus), "minus": len(minus)})
+    else:
+        # Bez předchozí verze (nebo podruhé týž den) řetěz nenavazuje: telefony stáhnou celý seznam
+        chain = []
+    limit = (dt.date.fromisoformat(today) - dt.timedelta(days=CHANGE_DAYS)).isoformat()
+    chain = [c for c in chain if c["den"] > limit]
+    keep = {c["den"] + ".bin" for c in chain}
+    for name in os.listdir(zdir):
+        if name not in keep:
+            os.remove(os.path.join(zdir, name))
+    pub["phish_retez"] = chain
+
+
 def update_public(state: dict, folder: str, now: int, notes: list):
     pub = state.setdefault("verejne", {})
     today = dt.datetime.fromtimestamp(now, dt.timezone.utc).strftime("%Y-%m-%d")
@@ -211,9 +242,15 @@ def update_public(state: dict, folder: str, now: int, notes: list):
     try:
         hosts = parse_phish(fetch(PHISH_URL, 180).decode("utf-8", "replace"))
         if len(hosts) >= 10000:
-            with open(os.path.join(folder, "phish.bin"), "wb") as f:
-                f.write(phish_bin(hosts))
+            new = phish_bin(hosts)
+            full = os.path.join(folder, "phish.bin")
+            old = open(full, "rb").read() if os.path.exists(full) else b""
+            prev = pub.get("phish_verze")
+            with open(full, "wb") as f:
+                f.write(new)
+            write_change(folder, pub, prev, today, old, new)
             pub["phish_pocet"] = len(hosts)
+            pub["phish_prefixu"] = len(new) // 5
             pub["phish_verze"] = today
         else:
             notes.append(f"Phishing.Database: jen {len(hosts)} stránek, ponechán starý seznam")
@@ -256,6 +293,8 @@ def main():
         "coi": len(coi),
         "phish": state.get("verejne", {}).get("phish_pocet", 0),
         "phish_verze": state.get("verejne", {}).get("phish_verze", ""),
+        "phish_prefixu": state.get("verejne", {}).get("phish_prefixu", 0),
+        "phish_retez": state.get("verejne", {}).get("phish_retez", []),
         "nova_hlaseni": counted,
         "cekajici": sum(1 for it in state.get("polozky", {}).values() if "x" not in it),
     }
