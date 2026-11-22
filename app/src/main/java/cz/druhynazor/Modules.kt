@@ -117,18 +117,29 @@ object Modules {
 
 /** Čte texty nahlas česky. */
 class Speaker(private val ctx: Context) {
+    // Jeden hlas na celou obrazovku: rozjíždí se jen jednou, pak mluví hned bez čekání.
     private var tts: TextToSpeech? = null
+    private var ready = false
+    private var pending: String? = null
 
     fun say(text: String) {
-        tts?.shutdown()
+        val t = tts
+        if (t != null && ready) { t.speak(text, TextToSpeech.QUEUE_FLUSH, null, "postarano"); return }
+        pending = text
+        if (t != null) return
         tts = Voice.tts(ctx) { status ->
             if (status == TextToSpeech.SUCCESS) {
+                ready = true
                 tts?.language = Locale("cs", "CZ")
                 tts?.setSpeechRate(0.9f)
-                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "postarano")
+                pending?.let { tts?.speak(it, TextToSpeech.QUEUE_FLUSH, null, "postarano") }
+                pending = null
             }
         }
     }
 
-    fun stop() { tts?.shutdown(); tts = null }
+    /** Přestat mluvit (hlas zůstane připravený). */
+    fun stop() { pending = null; tts?.stop() }
+
+    fun shutdown() { pending = null; tts?.shutdown(); tts = null; ready = false }
 }

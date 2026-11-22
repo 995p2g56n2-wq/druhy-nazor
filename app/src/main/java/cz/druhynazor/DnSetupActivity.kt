@@ -65,7 +65,7 @@ class DnSetupActivity : Activity() {
             "V okénku pak u češtiny stiskněte Instalovat a vraťte se šipkou vlevo nahoře.",
             button = "Ano, nastavit"),
         Step("perms", "✉️", "Zprávy a hovory",
-            "Smím hlídat vaše zprávy a hovory, abych vás včas varovala?",
+            "Budu hlídat vaše zprávy a hovory, abych vás včas varovala.",
             "V každém okénku pak stiskněte Povolit."),
         Step("sms", "💬", "Zprávy přes Postaráno",
             "Zprávy budu otevírat já, abych podvod zachytila dřív než vy.",
@@ -77,14 +77,14 @@ class DnSetupActivity : Activity() {
             "Na plochu dám obálku Zprávy, která hlídá podvody.",
             "V okénku pak zmáčkněte Přidat."),
         Step("calls", "📞", "Hlídání hovorů",
-            "Smím hlídat hovory, abych poznala podvodníka dřív, než zvednete?",
-            "V okénku pak vyberte Postaráno a potvrďte."),
+            "Budu hlídat hovory, abych poznala podvodníka dřív, než zvednete.",
+            "V okénku pak vyberte Postaráno a vpravo dole stiskněte Změnit na výchozí."),
         Step("overlay", "🚨", "Varování při hovoru",
             "Když volá podvodník, ukážu přes celou obrazovku červené varování.",
             "V seznamu pak najděte Postaráno a zapněte přepínač. Pak zmáčkněte šipku vlevo nahoře."),
         Step("chats", "🟢", "WhatsApp a Messenger",
             "Budu hlídat i WhatsApp a Messenger.",
-            "Pak zapněte přepínač a potvrďte Povolit. Nakonec zmáčkněte šipku vlevo nahoře.",
+            "V seznamu najděte Postaráno, zapněte přepínač a stiskněte Povolit. Nakonec zmáčkněte šipku vlevo nahoře.",
             note = "Je-li přepínač šedý („Omezené nastavení“): Nastavení → Aplikace → Postaráno → ⋮ vpravo nahoře → Povolit omezená nastavení. Pak to zkuste znovu."),
     ) }
 
@@ -129,46 +129,46 @@ class DnSetupActivity : Activity() {
     private var dialogHint: String? = null
 
     /**
-     * Pokyny do okénka telefonu: jeden pokyn = jedno ťuknutí, v pořadí.
-     * Okénko patří telefonu, takže nevíme, kdy přesně člověk ťukl. Proto pokyny říkáme
-     * po sobě s pauzou a po chvilce celé zopakujeme.
+     * Pokyny do okénka telefonu, v pořadí ťuknutí. Slovesa se střídají (ťukněte, stiskněte,
+     * zmáčkněte, vyberte). Nikdy nepředbíhat: další pokyn až podle toho, co se v telefonu
+     * opravdu změnilo (povolení, přepínač). Kde změnu poznat nejde (jedno okénko se dvěma
+     * ťuknutími), řekne se obojí najednou a opakuje se celé, nikdy jen ta druhá půlka.
      */
     private fun dialogSteps(id: String): List<String> = when (id) {
-        // Slovesa se střídají (ťukněte, stiskněte, zmáčkněte, vyberte), ať to nezní pořád stejně.
-        // Po přepínači v nastavení telefonu vždy vyvést ven šipkou vlevo nahoře.
-        "voice" -> listOf("U češtiny stiskněte Instalovat.", "Potom zmáčkněte šipku vlevo nahoře.")
-        "perms" -> listOf("Stiskněte Povolit.", "Když se objeví další okénko, zase zmáčkněte Povolit.")
-        "sms" -> listOf("Vyberte Postaráno.", "Teď stiskněte dole Změnit na výchozí.")
+        "voice" -> listOf("U češtiny stiskněte Instalovat.", "Až se stáhne, zmáčkněte šipku vlevo nahoře.")
+        "perms" -> listOf("Stiskněte Povolit.")
+        "sms", "calls" -> listOf("Vyberte Postaráno.", "Potom vpravo dole stiskněte Změnit na výchozí.")
         "uklid" -> listOf("Zmáčkněte Přidat.")
-        "calls" -> listOf("Vyberte Postaráno.", "Teď stiskněte tlačítko vpravo dole.")
-        "overlay" -> listOf("Najděte v seznamu Postaráno a ťukněte na něj.", "Teď zapněte přepínač, aby svítil.", "Nakonec zmáčkněte šipku vlevo nahoře.")
-        "chats" -> listOf("Zapněte přepínač, aby svítil.", "Teď stiskněte Povolit.", "Nakonec zmáčkněte šipku vlevo nahoře.")
+        "overlay" -> listOf("Najděte v seznamu Postaráno a ťukněte na něj.", "Potom zmáčkněte přepínač vpravo, aby svítil modře.")
+        "chats" -> listOf("Najděte v seznamu Postaráno a zmáčkněte přepínač vpravo, aby svítil modře.", "Potom stiskněte Povolit.")
         else -> listOf("Stiskněte Povolit.")
     }
 
     private val sayer = android.os.Handler(android.os.Looper.getMainLooper())
 
-    /** Okénko telefonu se otevírá: nahoře velký pokyn a hned ho říct nahlas. */
-    private fun showDialogHint(id: String) {
-        val list = dialogSteps(id)
-        dialogHint = list.mapIndexed { i, t -> "${i + 1}.  $t" }.joinToString("\n\n")
+    private fun showDialogHint(id: String) = guide(dialogSteps(id))
+
+    /** Nahoře velký pokyn a říct ho nahlas; když se nic nezmění, po chvíli ho zopakovat (ten samý). */
+    private fun guide(lines: List<String>, repeatMs: Long = 15_000, times: Int = 3) {
+        dialogHint = if (lines.size == 1) lines[0] else lines.mapIndexed { i, t -> "${i + 1}.  $t" }.joinToString("\n\n")
         render()
         sayer.removeCallbacksAndMessages(null)
         if (!Prefs(this).voiceOk) return
-        // Pokyny po jednom, s pauzou na ťuknutí; po chvilce celé ještě jednou
-        var at = 600L
-        repeat(2) {
-            for (t in list) {
-                sayer.postDelayed({ if (awaiting) speaker.say(t) }, at)
-                at += 4500
+        val text = lines.joinToString(" ")
+        var n = 0
+        val say = object : Runnable {
+            override fun run() {
+                if (!awaiting) return
+                speaker.say(text)
+                if (++n < times) sayer.postDelayed(this, repeatMs)
             }
-            at += 6000
         }
+        sayer.postDelayed(say, 300)
     }
 
     override fun onResume() {
         super.onResume()
-        watcher.removeCallbacksAndMessages(null)
+        // Hlídání okének (watchState) se zastaví samo, až evaluate() ukončí čekání.
         paused = false
         if (permsGranted(this)) GuardService.start(this)
         if (!ready) return
@@ -178,7 +178,8 @@ class DnSetupActivity : Activity() {
 
     override fun onDestroy() {
         sayer.removeCallbacksAndMessages(null)
-        speaker.stop()
+        watcher.removeCallbacksAndMessages(null)
+        speaker.shutdown()
         super.onDestroy()
     }
 
@@ -334,7 +335,6 @@ class DnSetupActivity : Activity() {
             "calls" -> requestRole(RoleManager.ROLE_CALL_SCREENING)
             "overlay" -> {
                 startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-                watchAndReturn(step.id)
             }
             "fullscreen" -> if (Build.VERSION.SDK_INT >= 34) {
                 startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:$packageName")))
@@ -348,36 +348,73 @@ class DnSetupActivity : Activity() {
                 else null
                 try { startActivity(direct ?: Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
                 catch (e: Exception) { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
-                watchAndReturn(step.id)
             }
         }
         // Otevřelo se okénko telefonu (u ikon na plochu to dělá pinNext)
-        if (awaiting && step.id != "uklid") showDialogHint(step.id)
+        if (awaiting && step.id != "uklid") {
+            showDialogHint(step.id)
+            if (step.id in setOf("perms", "overlay", "chats")) watchState(step.id)
+        }
     }
 
     private val watcher = android.os.Handler(android.os.Looper.getMainLooper())
 
     /**
-     * Přepínač v nastavení telefonu: jakmile ho člověk zapne, vrátíme se sami.
-     * Nikdo nemusí hledat šipku zpět.
+     * Hlídá, co se v telefonu opravdu změnilo, a podle toho řekne další pokyn.
+     * - Povolení: každé ťuknutí na Povolit je hned vidět, tak se řekne „zase Povolit“ až po něm.
+     * - Přepínač: jakmile svítí, zkusíme se vrátit sami; když to telefon nedovolí, navedeme
+     *   na šipku vlevo nahoře (a znovu, když se objeví ještě jeden seznam).
      */
-    private fun watchAndReturn(id: String) {
+    private fun watchState(id: String) {
         watcher.removeCallbacksAndMessages(null)
-        val until = System.currentTimeMillis() + 3 * 60_000
+        val until = System.currentTimeMillis() + 5 * 60_000
+        var granted = if (id == "perms") perms().count { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED } else 0
+        var doneAt = 0L
+        var backSaid = 0
         val check = object : Runnable {
             override fun run() {
-                if (!paused || isFinishing) return
-                if (isDone(this@DnSetupActivity, id)) {
-                    try {
-                        startActivity(Intent(this@DnSetupActivity, DnSetupActivity::class.java)
-                            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-                    } catch (_: Exception) { }
-                    return
+                if (!awaiting || isFinishing || System.currentTimeMillis() > until) return
+                if (id == "perms") {
+                    val now = perms().count { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
+                    if (now > granted && now < perms().size) guide(listOf("Výborně. Teď zase stiskněte Povolit."))
+                    granted = now
+                } else if (paused && isDone(this@DnSetupActivity, id)) {
+                    val t = System.currentTimeMillis()
+                    if (doneAt == 0L) { doneAt = t; comeBack() }
+                    else if (t - doneAt > 1500 && backSaid == 0) {
+                        backSaid = 1
+                        guide(listOf("Teď zmáčkněte šipku vlevo nahoře."), repeatMs = 8000, times = 1)
+                    } else if (t - doneAt > 1500 + backSaid * 8000L && backSaid < 5) {
+                        backSaid++
+                        guide(listOf("Zmáčkněte ještě jednou šipku vlevo nahoře."), repeatMs = 8000, times = 1)
+                    }
                 }
-                if (System.currentTimeMillis() < until) watcher.postDelayed(this, 600)
+                watcher.postDelayed(this, 400)
             }
         }
-        watcher.postDelayed(check, 1000)
+        watcher.postDelayed(check, 500)
+    }
+
+    /**
+     * Vrátit se do průvodce z nastavení telefonu. Od Androidu 15 to jde jen, když je zrovna
+     * vidět naše překrytí, proto na okamžik přidáme neviditelný bod přes obrazovku.
+     */
+    private fun comeBack() {
+        val wm = getSystemService(android.view.WindowManager::class.java)
+        var dot: View? = null
+        if (Settings.canDrawOverlays(this) && wm != null) try {
+            dot = View(applicationContext)
+            wm.addView(dot, android.view.WindowManager.LayoutParams(1, 1,
+                android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                android.graphics.PixelFormat.TRANSLUCENT))
+        } catch (_: Exception) { dot = null }
+        try {
+            startActivity(Intent(this, DnSetupActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        } catch (_: Exception) { }
+        dot?.let { v -> watcher.postDelayed({ try { wm?.removeView(v) } catch (_: Exception) { } }, 1500) }
     }
 
     private fun requestRole(role: String) {
