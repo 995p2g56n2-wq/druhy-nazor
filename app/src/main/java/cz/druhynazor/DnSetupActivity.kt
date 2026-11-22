@@ -69,7 +69,7 @@ class DnSetupActivity : Activity() {
             "V okénku pak vyberte Postaráno a stiskněte Změnit na výchozí."),
         Step("perms", "✉️", "Zprávy a hovory",
             "Budu hlídat vaše zprávy a hovory, abych vás včas varovala.",
-            "V každém okénku pak stiskněte Povolit."),
+            "Ukážou se okénka pro oznámení, hovory a SMS. V každém stiskněte Povolit."),
         if (needsAppIcon) Step("uklid", "✉️", "Ikony na plochu",
             "Na plochu dám štít Postaráno a obálku Zprávy, která hlídá podvody.",
             "Ukážou se dvě okénka a v obou zmáčkněte Přidat.")
@@ -137,7 +137,9 @@ class DnSetupActivity : Activity() {
      */
     private fun dialogSteps(id: String): List<String> = when (id) {
         "voice" -> listOf("U češtiny stiskněte Instalovat.", "Až se stáhne, zmáčkněte šipku vlevo nahoře.")
-        "perms" -> listOf("Stiskněte Povolit.")
+        // Android každou skupinu povolení ukáže ve vlastním okénku, sloučit je nejde.
+        // Aspoň dopředu říct, kolik jich bude, a vypsat je na jednom místě.
+        "perms" -> listOf(permsLeftText(), "V každém stiskněte Povolit.")
         "sms", "calls" -> listOf("Vyberte Postaráno.", "Potom vpravo dole stiskněte Změnit na výchozí.")
         "uklid" -> listOf("Zmáčkněte Přidat.")
         // Seznam aplikací je dlouhý a senior v něm Postaráno snadno přehlédne: polopatě, jak hledat a posunout
@@ -152,6 +154,20 @@ class DnSetupActivity : Activity() {
             "U Postaráno vpravo zmáčkněte přepínač, aby svítil modře.",
             "Potom stiskněte Povolit.")
         else -> listOf("Stiskněte Povolit.")
+    }
+
+    /** Kolik okének Povolit ještě přijde a pro co (oznámení, hovory, SMS). */
+    private fun permsLeftText(): String {
+        val missing = perms().filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        val groups = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= 33 && Manifest.permission.POST_NOTIFICATIONS in missing) groups += "oznámení"
+        if (Manifest.permission.READ_PHONE_STATE in missing) groups += "telefonní hovory"
+        if (missing.any { it.contains("SMS") }) groups += "SMS"
+        return when (groups.size) {
+            0, 1 -> "Ukáže se okénko" + (groups.firstOrNull()?.let { " pro $it" } ?: "") + "."
+            2 -> "Ukážou se dvě okénka: ${groups[0]} a ${groups[1]}."
+            else -> "Ukážou se tři okénka: ${groups[0]}, ${groups[1]} a ${groups[2]}."
+        }
     }
 
     private val sayer = android.os.Handler(android.os.Looper.getMainLooper())
