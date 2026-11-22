@@ -64,12 +64,12 @@ class DnSetupActivity : Activity() {
             "Telefon zatím neumí mluvit česky.",
             "V okénku pak u češtiny stiskněte Instalovat a vraťte se šipkou vlevo nahoře.",
             button = "Ano, nastavit"),
-        Step("perms", "✉️", "Zprávy a hovory",
-            "Budu hlídat vaše zprávy a hovory, abych vás včas varovala.",
-            "V každém okénku pak stiskněte Povolit."),
         Step("sms", "💬", "Zprávy přes Postaráno",
             "Zprávy budu otevírat já, abych podvod zachytila dřív než vy.",
             "V okénku pak vyberte Postaráno a stiskněte Změnit na výchozí."),
+        Step("perms", "✉️", "Zprávy a hovory",
+            "Budu hlídat vaše zprávy a hovory, abych vás včas varovala.",
+            "V každém okénku pak stiskněte Povolit."),
         if (needsAppIcon) Step("uklid", "✉️", "Ikony na plochu",
             "Na plochu dám štít Postaráno a obálku Zprávy, která hlídá podvody.",
             "Ukážou se dvě okénka a v obou zmáčkněte Přidat.")
@@ -222,6 +222,10 @@ class DnSetupActivity : Activity() {
     private fun next() { failed = false; index++; render() }
 
     private fun render() {
+        // Krok, který se mezitím udělal sám, přeskočit: výchozí Zprávy dostanou od telefonu
+        // povolení ke zprávám, hovorům i oznámením, takže okénka Povolit pak už nejsou potřeba.
+        if (!awaiting && !failed && index >= 0)
+            while (index < todo.size && todo[index].id != "uklid" && isDone(this, todo[index].id)) index++
         if (index >= todo.size) { setResult(RESULT_OK); finish(); return }
         val root = Ui.column(this, 20, 18).apply { setBackgroundColor(Ui.BG) }
         val hint = dialogHint
