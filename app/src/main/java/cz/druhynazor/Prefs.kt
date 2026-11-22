@@ -82,6 +82,9 @@ class Prefs(context: Context) {
         get() = p.getString("senior_name", "Babička") ?: "Babička"
         set(v) = p.edit().putString("senior_name", v).apply()
 
+    /** Taťka nebo Děda: do zpráv rodině „vyfotil“, ne „vyfotila“. */
+    val seniorMale: Boolean get() = seniorName == "Taťka" || seniorName == "Děda"
+
     /** Totéž ve 2. pádě: „telefon mamky“. */
     val seniorGenitive: String get() = GENITIVE[seniorName] ?: seniorName
 

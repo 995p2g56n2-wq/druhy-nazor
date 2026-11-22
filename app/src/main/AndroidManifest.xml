@@ -62,6 +62,25 @@
         <activity android:name=".DruhyNazorActivity" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".DnSetupActivity" android:exported="false" />
         <activity android:name=".MessageActivity" android:exported="false" />
+        <activity
+            android:name=".LetterActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:screenOrientation="portrait" />
+
+        <receiver android:name=".LetterReminderReceiver" android:exported="false" />
+        <receiver android:name=".MmsSentReceiver" android:exported="false" />
+
+        <!-- Připravená MMS s fotkou dopisu pro rodinu (čte ji jen telefon při odesílání) -->
+        <provider
+            android:name=".MmsFileProvider"
+            android:authorities="${applicationId}.mms"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
+        <!-- Čtení textu dopisu přímo v telefonu (bez internetu) -->
+        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="ocr" />
 
         <activity
             android:name=".ScamCallActivity"

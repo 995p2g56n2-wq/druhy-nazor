@@ -26,6 +26,7 @@ data class Module(
 /** Seznam pomocníků. Hotové jsou zapnuté samy, nehotové se nikde neukazují. */
 object Modules {
     const val DN = "dn"
+    const val DOPIS = "do"
 
     val all = listOf(
         Module(DN, "Druhý názor", "🛡️",
@@ -38,6 +39,15 @@ object Modules {
                 "Rodina hned dostane zprávu, aby vám mohla zavolat a uklidnit vás."),
             rodina = "Jen zprávu, že přišel podezřelý hovor nebo SMS. Vaše běžné zprávy nevidí nikdo.",
             bezpeci = "Aplikace vaše SMS nikam neposílá. Zkontroluje jen to nutné přímo v telefonu."),
+        Module(DOPIS, "Dopisy", "📄",
+            "Namiřte telefon na dopis. Aplikace nahlas řekne, o co jde, jestli je pravý a co udělat.", ready = true, more = false,
+            co = "Přečte dopis za vás a řekne třemi větami, o co jde, jestli je pravý a co udělat do kdy.",
+            jak = listOf(
+                "Ťuknete na Dopis a namíříte telefon na papír. Vyfotí se sám.",
+                "Aplikace dopis přečte a nahlas řekne, o co jde, jestli je pravý a co udělat.",
+                "Termín vám připomene a fotku s shrnutím pošle rodině."),
+            rodina = "Fotku dopisu a shrnutí, když na Poslat rodině ťuknete vy, nebo když je dopis podvod.",
+            bezpeci = "Dopis se čte přímo v telefonu, nikam se neposílá. Aplikace nikdy sama neplatí."),
         Module("en", "Energie", "⚡",
             "Vyfoťte fakturu nebo elektroměr. Aplikace lidsky vysvětlí, co platíte a jak ušetřit.", ready = false, more = false,
             co = "Vysvětlí fakturu za elektřinu tak, aby jí rozuměl každý, a poradí, jak ušetřit.",
