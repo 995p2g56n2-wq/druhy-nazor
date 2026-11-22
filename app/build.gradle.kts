@@ -11,8 +11,8 @@ android {
         applicationId = "cz.druhynazor.test"
         minSdk = 29
         targetSdk = 34
-        versionCode = 24
-        versionName = "0.24-zkusebni"
+        versionCode = 25
+        versionName = "0.25-zkusebni"
     }
 
     signingConfigs {
@@ -38,4 +38,15 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    testOptions {
+        unitTests.all { it.testLogging { showStandardStreams = true; events("passed", "failed") } }
+    }
+}
+
+dependencies {
+    // Modul Dopisy: fotoaparát, který sám najde okraje papíru (stahuje se přes služby Google)
+    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
+    // Čtení textu z fotky přímo v telefonu, bez internetu
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    testImplementation("junit:junit:4.13.2")
 }

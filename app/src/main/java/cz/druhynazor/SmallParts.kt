@@ -39,5 +39,6 @@ class BootReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED && Modules.DN in Modules.installed(context)) {
             GuardService.start(context)
         }
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) LetterReminder.restore(context)
     }
 }

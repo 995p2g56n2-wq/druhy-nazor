@@ -26,6 +26,7 @@ class MainActivity : Activity() {
 
     private var screen = Screen.HOME
     private var manualShown = false
+    private var letterPrepared = false
     private lateinit var speaker: Speaker
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,10 +57,11 @@ class MainActivity : Activity() {
         BackGuide.uiVisible = true
         if (Modules.DN in Modules.installed(this) && DnSetupActivity.permsGranted(this)) GuardService.start(this)
         render()
+        if (screen == Screen.HOME && !letterPrepared) { letterPrepared = true; LetterActivity.prepare(this) }
         // Hlídání po spuštění chvíli nabíhá (třeba po aktualizaci), stav pak zkontrolovat znovu.
         // Teprve potom případně dát vědět rodině, že ochrana není celá zapnutá.
         window.decorView.postDelayed({
-            if (screen == Screen.HOME && !isFinishing) { render(); alertFamilyIfNeeded() }
+            if (screen == Screen.HOME && !isFinishing) { render(); alertFamilyIfNeeded(); announceLetters() }
         }, 3000)
     }
 
@@ -249,7 +251,10 @@ class MainActivity : Activity() {
         tiles += "✉️\nZprávy" to {
             startActivity(Intent(this, DruhyNazorActivity::class.java).putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true))
         }
-        // Další hotoví pomocníci (Dopisy, Energie) sem přibydou sami.
+        if (Modules.DOPIS in Modules.installed(this)) tiles += "📄\nDopis" to {
+            startActivity(Intent(this, LetterActivity::class.java))
+        }
+        // Další hotoví pomocníci (Energie) sem přibydou sami.
         tiles.chunked(2).forEach { pair ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             pair.forEachIndexed { i, (label, open) ->
@@ -285,6 +290,17 @@ class MainActivity : Activity() {
         prefs.setupAlertTime = now
         Family.sms(this, "Postaráno: Na telefonu ${prefs.seniorGenitive} není ochrana celá zapnutá. " +
             "Až u něj budete, otevřete Postaráno, ťukněte dole na Pro rodinu a pak na Dokončit nastavení.")
+    }
+
+    /** Nový pomocník Dopisy: rodina to jednou dostane v SMS, senior nemusí nic vysvětlovat. */
+    private fun announceLetters() {
+        val prefs = Prefs(this)
+        val p = getSharedPreferences("dopisy", MODE_PRIVATE)
+        if (p.getBoolean("ohlaseno", false) || prefs.familyContacts.isEmpty() || !canSms()) return
+        p.edit().putBoolean("ohlaseno", true).apply()
+        Family.sms(this, "Postaráno: Na telefonu ${prefs.seniorGenitive} přibyl pomocník Dopisy. Na úvodní obrazovce je dlaždice Dopis: " +
+            "stačí namířit telefon na dopis a aplikace nahlas řekne, o co jde, jestli je pravý a co udělat. " +
+            "Tlačítkem Poslat rodině vám přijde shrnutí a fotka dopisu. Podezřelý dopis vám pošle sama.")
     }
 
     @Deprecated("Activity API")

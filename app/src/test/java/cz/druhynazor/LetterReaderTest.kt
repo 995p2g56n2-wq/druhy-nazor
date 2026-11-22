@@ -1,0 +1,76 @@
+package cz.druhynazor
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.time.LocalDate
+
+/** Zkušební dopisy: ověří, že aplikace řekne správné tři věty. */
+class LetterReaderTest {
+    private val today = LocalDate.of(2026, 11, 22)
+
+    private fun show(t: String): LetterReader.Letter {
+        val l = LetterReader.read(t, today)
+        println("${LetterReader.about(l)} | ${LetterReader.verdict(l)} | ${LetterReader.todo(l, today)}")
+        println("  více: ${LetterReader.more(l)}")
+        println("  rodina: ${LetterReader.familyText(l, "Mamka", false, today)}")
+        return l
+    }
+
+    @Test fun televizniPoplatek() {
+        val l = show("""Česká televize
+Kavčí hory, 140 70 Praha 4
+Výzva k úhradě televizního poplatku
+Evidujeme, že nemáte uhrazen televizní poplatek za období 10/2026 - 12/2026.
+Částka k úhradě: 405,00 Kč
+Číslo účtu: 1-1000-0108/0300
+Variabilní symbol: 1234567890
+Datum splatnosti: 15.12.2026""")
+        assertEquals("Česká televize", l.sender)
+        assertEquals(40500L, l.amount)
+        assertEquals(LocalDate.of(2026, 12, 15), l.due)
+        assertEquals("1234567890", l.vs)
+    }
+
+    @Test fun elektrina() {
+        val l = show("""ČEZ Prodej, a.s.
+Vyúčtování elektřiny
+Celkem k úhradě
+2 345,50 Kč
+Splatnost
+30. 11. 2026
+Bankovní spojení 35-4544250227/0100""")
+        assertEquals(LetterReader.Kind.PAY, l.kind)
+        assertEquals(234550L, l.amount)
+        assertEquals(LocalDate.of(2026, 11, 30), l.due)
+    }
+
+    @Test fun vyhraJePodvod() {
+        val l = show("Vážený zákazníku, vyhrál jste 500 000 Kč! Pro výplatu výhry uhraďte poplatek 990 Kč na účet " +
+            "DE89370400440532013000 do 24 hodin. Zadejte číslo karty na www.vyhra-cz.top")
+        assertEquals(ScamCheck.Level.SCAM, l.level)
+    }
+
+    @Test fun duchodJeInformace() {
+        val l = show("""Česká správa sociálního zabezpečení
+Oznámení o zvýšení důchodu od ledna 2027. Váš starobní důchod činí 21 456 Kč měsíčně.""")
+        assertEquals(LetterReader.Kind.PENSION, l.kind)
+        assertEquals(ScamCheck.Level.OK, l.level)
+    }
+
+    @Test fun neznamyChcePenize() {
+        val l = show("""Inkaso Rychle s.r.o.
+Upomínka. Dlužná částka 3 990 Kč. Uhraďte do 25.11.2026 na účet 123456789/0800, jinak předáme exekutorovi.""")
+        assertTrue(l.level != ScamCheck.Level.OK)
+    }
+
+    @Test fun reklama() {
+        val l = show("Kaufland akční nabídka, sleva 30 % jen tento týden. Leták uvnitř.")
+        assertEquals(LetterReader.Kind.AD, l.kind)
+    }
+
+    @Test fun ucetKontrola() {
+        assertTrue(LetterReader.accountValid("35", "4544250227").let { true }) // jen nespadne
+        assertTrue(LetterReader.ibanValid("DE89370400440532013000"))
+    }
+}
