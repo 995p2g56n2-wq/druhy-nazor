@@ -66,6 +66,7 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         BackGuide.uiVisible = false
+        speaker.stop()
     }
 
     override fun onDestroy() {
@@ -73,7 +74,8 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
-    private fun go(s: Screen) { screen = s; render() }
+    // Při odchodu z obrazovky hned umlknout, ať hlas nemluví o obrazovce, která už není vidět
+    private fun go(s: Screen) { if (s != screen) speaker.stop(); screen = s; render() }
 
     @Deprecated("Activity API")
     override fun onBackPressed() {
@@ -145,8 +147,8 @@ class MainActivity : Activity() {
         val prefs = Prefs(this)
         spacer(root, 16)
         root.addView(Ui.text(this, "Jak vám ${prefs.familyFirstName} říká?", 28f, bold = true, center = true))
-        root.addView(Ui.text(this, "Podle toho mu budu psát. Teď vyberte jedno z tlačítek.", 20f, center = true, color = Ui.MUTED))
-        speakDone("Jak vám ${prefs.familyFirstName} říká? Podle toho mu budu psát. Teď vyberte jedno z tlačítek.")
+        root.addView(Ui.text(this, "Podle toho mu budu psát. Teď ťukněte dole na to, jak vám říká, třeba Mami nebo Babi.", 20f, center = true, color = Ui.MUTED))
+        speakDone("Jak vám ${prefs.familyFirstName} říká? Podle toho mu budu psát. Teď ťukněte dole na to, jak vám říká, třeba Mami nebo Babi.")
         for ((label, name) in Prefs.CALLS) {
             root.addView(Ui.button(this, label, Ui.CARD, Ui.INK, sp = 24f) { chooseCall(name) })
         }
