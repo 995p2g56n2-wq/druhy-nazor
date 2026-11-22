@@ -137,6 +137,16 @@ class DruhyNazorActivity : Activity() {
         val cfg = Ui.card(this)
         cfg.addView(Ui.text(this, "Nastavení pro zkoušení", 22f, bold = true))
 
+        cfg.addView(Ui.text(this, SharedList.status(this), 16f, color = Ui.MUTED))
+        cfg.addView(Ui.button(this, "Stáhnout společný seznam teď", Ui.CARD, Ui.ACCENT, sp = 17f) {
+            Toast.makeText(this, "Stahuji…", Toast.LENGTH_SHORT).show()
+            SharedList.refresh(this, force = true) { ok ->
+                Toast.makeText(this, if (ok) "Staženo" else "Nepodařilo se, zkontrolujte internet", Toast.LENGTH_SHORT).show()
+                if (!isFinishing) render()
+            }
+            SharedList.sendQueue(this)
+        })
+
         cfg.addView(Ui.text(this, "Čísla, která se v testu chovají jako podvodníci (oddělte čárkou)", 16f, color = Ui.MUTED))
         val scam = Ui.input(this, prefs.testScamNumbers, "např. 777 111 222", multi = true); cfg.addView(scam)
         cfg.addView(Ui.text(this, "Po kolika minutách hovoru s neznámým číslem upozornit rodinu", 16f, color = Ui.MUTED))
@@ -215,7 +225,7 @@ class DruhyNazorActivity : Activity() {
     private fun messageRow(sms: Sms): View {
         val fromFamily = Prefs(this).familyByNumber(sms.address) != null
         val checked = if (!sms.incoming) null
-            else if (fromFamily) ScamCheck.Result(ScamCheck.Level.OK, "", emptyList()) else TrustedSenders.check(this, sms.body, sms.address)
+            else if (fromFamily) ScamCheck.Result(ScamCheck.Level.OK, "", emptyList()) else SharedList.check(this, sms.body, sms.address)
         // Rozhodnutí rodiny má přednost před automatickou kontrolou
         val result = when (if (sms.incoming) Verdicts.get(this, Verdicts.keyForSms(sms.id)) else null) {
             Verdicts.Verdict.OK -> ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())

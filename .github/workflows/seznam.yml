@@ -1,0 +1,50 @@
+name: Společný seznam podvodů
+
+# Každých 15 minut přečte nová hlášení od telefonů, jednou denně stáhne veřejné seznamy
+# (ČOI, Phishing.Database) a zveřejní hotový seznam ve větvi „seznam“.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+  # Při úpravě serveru vyzkoušet hned v návrhu změn
+  pull_request:
+    paths: ["server/**", ".github/workflows/seznam.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: spolecny-seznam
+  cancel-in-progress: false
+
+jobs:
+  seznam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Načíst minulý stav
+        run: |
+          mkdir -p data
+          if git fetch --depth=1 origin seznam; then
+            git --work-tree=data checkout FETCH_HEAD -- .
+            git reset -q
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Spočítat hlášení a stáhnout veřejné seznamy
+        run: python -I server/seznam.py data
+
+      - name: Zveřejnit
+        run: |
+          cd data
+          git init -q -b seznam
+          git config user.name "Postaráno seznam"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          printf '# Společný seznam podvodů pro Postaráno\n\nVytváří se samo (server/seznam.py). Nic tu neupravujte ručně.\n' > README.md
+          git add -A
+          git commit -q -m "Seznam $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" seznam
