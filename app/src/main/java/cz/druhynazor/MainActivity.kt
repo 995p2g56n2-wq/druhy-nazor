@@ -33,6 +33,8 @@ class MainActivity : Activity() {
         Notify.setup(this)
         speaker = Speaker(this)
         screen = if (Modules.onboarded(this)) Screen.HOME else Screen.START
+        // Mluvit už od výběru rodiny: zjistit hned, jestli telefon umí česky
+        if (screen == Screen.START) Voice.check(this) { ok -> Prefs(this).voiceOk = ok }
         handleSendTo(intent)
     }
 
@@ -61,7 +63,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        speaker.stop()
+        speaker.shutdown()
         super.onDestroy()
     }
 
@@ -119,7 +121,9 @@ class MainActivity : Activity() {
         spacer(root, 16)
         root.addView(Ui.text(this, "👨‍👩‍👧", 72f, center = true))
         root.addView(Ui.text(this, "Komu dáme vědět, když se něco stane?", 28f, bold = true, center = true))
+        val say = "Komu dáme vědět, když se něco stane? Vyberte někoho z rodiny, přijde mu jen SMS. Teď stiskněte dole Vybrat z kontaktů."
         root.addView(Ui.text(this, "Vyberte někoho z rodiny, přijde mu jen SMS. Teď stiskněte dole Vybrat z kontaktů.", 20f, center = true))
+        speakDone(say)
         spacer(root, 16)
         root.addView(Ui.button(this, "Vybrat z kontaktů", sp = 22f) { FamilyUi.pick(this) })
         if (manualShown) {
@@ -136,6 +140,7 @@ class MainActivity : Activity() {
         spacer(root, 16)
         root.addView(Ui.text(this, "Jak vám ${prefs.familyFirstName} říká?", 28f, bold = true, center = true))
         root.addView(Ui.text(this, "Podle toho mu budu psát. Teď vyberte jedno z tlačítek.", 20f, center = true, color = Ui.MUTED))
+        speakDone("Jak vám ${prefs.familyFirstName} říká? Podle toho mu budu psát. Teď vyberte jedno z tlačítek.")
         for ((label, name) in Prefs.CALLS) {
             root.addView(Ui.button(this, label, Ui.CARD, Ui.INK, sp = 24f) { chooseCall(name) })
         }
