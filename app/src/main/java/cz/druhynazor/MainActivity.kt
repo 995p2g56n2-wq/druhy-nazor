@@ -53,6 +53,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        BackGuide.uiVisible = true
         if (Modules.DN in Modules.installed(this) && DnSetupActivity.permsGranted(this)) GuardService.start(this)
         render()
         // Hlídání po spuštění chvíli nabíhá (třeba po aktualizaci), stav pak zkontrolovat znovu.
@@ -60,6 +61,11 @@ class MainActivity : Activity() {
         window.decorView.postDelayed({
             if (screen == Screen.HOME && !isFinishing) { render(); alertFamilyIfNeeded() }
         }, 3000)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        BackGuide.uiVisible = false
     }
 
     override fun onDestroy() {
