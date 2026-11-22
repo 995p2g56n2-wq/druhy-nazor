@@ -39,9 +39,10 @@ Celkem k úhradě
 2 345,50 Kč
 Splatnost
 30. 11. 2026
-Bankovní spojení 35-4544250227/0100""")
+Bankovní spojení 19-2000145399/0800""")
         assertEquals(LetterReader.Kind.PAY, l.kind)
         assertEquals(234550L, l.amount)
+        assertEquals(ScamCheck.Level.OK, l.level)
         assertEquals(LocalDate.of(2026, 11, 30), l.due)
     }
 
@@ -62,6 +63,7 @@ Oznámení o zvýšení důchodu od ledna 2027. Váš starobní důchod činí 2
         val l = show("""Inkaso Rychle s.r.o.
 Upomínka. Dlužná částka 3 990 Kč. Uhraďte do 25.11.2026 na účet 123456789/0800, jinak předáme exekutorovi.""")
         assertTrue(l.level != ScamCheck.Level.OK)
+        assertEquals(LetterReader.Kind.DEBT, l.kind)
     }
 
     @Test fun reklama() {

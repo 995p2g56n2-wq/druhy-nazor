@@ -89,7 +89,7 @@ object LetterReader {
 
     private fun r(p: String) = Regex(p, setOf(RegexOption.IGNORE_CASE))
 
-    private val exekuceRe = r("exekuc|exekutor")
+    private val exekuceRe = r("exekuční příkaz|exekucni prikaz|exekutorský úřad|exekutorsky urad|soudní exekutor|soudni exekutor|zahájení exekuce|zahajeni exekuce|nařízení exekuce|narizeni exekuce")
     private val courtRe = r("rozsud|předvolání|predvolani|platební rozkaz|platebni rozkaz|usnesení soudu|okresní soud|krajský soud|obvodní soud|městský soud")
     private val debtRe = r("upomínk|upomink|výzva k (zaplacení|úhradě)|vyzva k (zaplaceni|uhrade)|předžalobní|predzalobni|dlužn|dluzn|po splatnosti|nedoplatek|neuhrazen")
     private val payRe = r("k úhradě|k uhrade|faktura|vyúčtování|vyuctovani|zaplaťte|zaplatte|uhraďte|uhradte|částka|castka|splatnost|splatné|splatne|složenk|slozenk|platební údaje|platebni udaje|předpis plateb|zálohy|zalohy|poplatek|pojistné|pojistne")
@@ -287,7 +287,7 @@ object LetterReader {
     private fun guessSender(lines: List<String>): String? {
         val firm = Regex("(s\\.\\s?r\\.\\s?o\\.|a\\.\\s?s\\.|spol\\.|úřad|urad|z\\.\\s?s\\.|o\\.\\s?p\\.\\s?s\\.|družstvo|bank)", RegexOption.IGNORE_CASE)
         return lines.take(15).firstOrNull { firm.containsMatchIn(it) && it.length in 4..60 }
-            ?.replace(Regex(",?\\s*(IČO?|DIČ).*$", RegexOption.IGNORE_CASE), "")?.trim()
+            ?.replace(Regex(",?\\s*(IČO?|DIČ).*$", RegexOption.IGNORE_CASE), "")?.trim()?.trimEnd(',')
     }
 
     // ---------- Věty pro seniora ----------
@@ -311,7 +311,7 @@ object LetterReader {
         return when (l.kind) {
             Kind.PAY -> if (l.what != null) "$subject chce zaplatit ${l.what}$sum." else
                 if (who != null) "$who chce zaplatit$sum." else "Dopis chce zaplatit$sum."
-            Kind.DEBT -> "${who ?: "Někdo"} upomíná, že je potřeba doplatit$sum."
+            Kind.DEBT -> "${who ?: "Někdo"} upomíná, že je potřeba doplatit${l.what?.let { " $it" } ?: ""}$sum."
             Kind.EXEKUCE -> "Je to dopis o exekuci" + (if (l.amount != null) " na$sum." else ".")
             Kind.COURT -> "Je to dopis od soudu."
             Kind.REFUND -> "${who ?: "Někdo"} vám vrací přeplatek$sum."
@@ -348,11 +348,11 @@ object LetterReader {
 
     /** Více: nejvýš 5 krátkých vět. */
     fun more(l: Letter): List<String> = listOfNotNull(
-        l.sender?.let { "Odesílatel: ${capital(it)}." },
+        l.sender?.let { "Odesílatel: ${capital(it).trimEnd('.')}." },
         l.amount?.let { "Částka: ${money(it)}." },
         (l.accounts.firstOrNull()?.text ?: l.ibans.firstOrNull())?.let { acc ->
             "Účet: $acc" + (l.vs?.let { ", variabilní symbol $it." } ?: ".")
-        },
+        } ?: l.vs?.let { "Variabilní symbol: $it." },
         l.due?.let { "Termín: ${date(it)} ${it.year}." },
         l.reasons.first(),
     ).take(5)
