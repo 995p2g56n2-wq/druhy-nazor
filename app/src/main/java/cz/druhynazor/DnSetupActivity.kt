@@ -81,10 +81,10 @@ class DnSetupActivity : Activity() {
             "V okénku pak vyberte Postaráno a vpravo dole stiskněte Změnit na výchozí."),
         Step("overlay", "🚨", "Varování při hovoru",
             "Když volá podvodník, ukážu přes celou obrazovku červené varování.",
-            "V seznamu pak najděte Postaráno a zapněte přepínač. Pak zmáčkněte šipku vlevo nahoře."),
+            "Ukáže se dlouhý seznam aplikací. V klidu v něm najděte Postaráno, klidně posuňte prstem, a zapněte přepínač vpravo."),
         Step("chats", "🟢", "WhatsApp a Messenger",
             "Budu hlídat i WhatsApp a Messenger.",
-            "V seznamu najděte Postaráno, zapněte přepínač a stiskněte Povolit. Nakonec zmáčkněte šipku vlevo nahoře.",
+            "Ukáže se dlouhý seznam aplikací. V klidu v něm najděte Postaráno, klidně posuňte prstem, zapněte přepínač vpravo a stiskněte Povolit.",
             note = "Je-li přepínač šedý („Omezené nastavení“): Nastavení → Aplikace → Postaráno → ⋮ vpravo nahoře → Povolit omezená nastavení. Pak to zkuste znovu."),
     ) }
 
@@ -140,14 +140,26 @@ class DnSetupActivity : Activity() {
         "perms" -> listOf("Stiskněte Povolit.")
         "sms", "calls" -> listOf("Vyberte Postaráno.", "Potom vpravo dole stiskněte Změnit na výchozí.")
         "uklid" -> listOf("Zmáčkněte Přidat.")
-        "overlay" -> listOf("Najděte v seznamu Postaráno a ťukněte na něj.", "Potom zmáčkněte přepínač vpravo, aby svítil modře.")
-        "chats" -> listOf("Najděte v seznamu Postaráno a zmáčkněte přepínač vpravo, aby svítil modře.", "Potom stiskněte Povolit.")
+        // Seznam aplikací je dlouhý a senior v něm Postaráno snadno přehlédne: polopatě, jak hledat a posunout
+        "overlay" -> listOf(
+            "Teď uvidíte seznam. Každý řádek je jedna aplikace.",
+            "V klidu řádky projděte a najděte Postaráno. Když ho nevidíte, přejeďte prstem po obrazovce zdola nahoru.",
+            "Na Postaráno ťukněte.",
+            "Potom zmáčkněte přepínač vpravo, aby svítil modře.")
+        "chats" -> listOf(
+            "Teď uvidíte seznam. Každý řádek je jedna aplikace.",
+            "V klidu řádky projděte a najděte Postaráno. Když ho nevidíte, přejeďte prstem po obrazovce zdola nahoru.",
+            "U Postaráno vpravo zmáčkněte přepínač, aby svítil modře.",
+            "Potom stiskněte Povolit.")
         else -> listOf("Stiskněte Povolit.")
     }
 
     private val sayer = android.os.Handler(android.os.Looper.getMainLooper())
 
-    private fun showDialogHint(id: String) = guide(dialogSteps(id))
+    private fun showDialogHint(id: String) =
+        // U dlouhého seznamu aplikací opakovat častěji a déle, hledání chvíli trvá
+        if (id == "overlay" || id == "chats") guide(dialogSteps(id), repeatMs = 20_000, times = 6)
+        else guide(dialogSteps(id))
 
     /** Nahoře velký pokyn a říct ho nahlas; když se nic nezmění, po chvíli ho zopakovat (ten samý). */
     private fun guide(lines: List<String>, repeatMs: Long = 15_000, times: Int = 3) {
