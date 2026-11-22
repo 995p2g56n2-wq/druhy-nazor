@@ -308,7 +308,7 @@ object SharedList {
         tmp.renameTo(f)
     }
 
-    /** Stáhne nový seznam, když se na serveru změnil. Velký světový seznam (asi 2 MB) jen přes Wi-Fi, nebo jednou za týden. */
+    /** Stáhne nový seznam, když se na serveru změnil. Světový seznam po denních přírůstcích (viz updatePhish). */
     fun refresh(ctx: Context, force: Boolean = false, onDone: ((Boolean) -> Unit)? = null) {
         val app = ctx.applicationContext
         thread(name = "seznam-stazeni") {
@@ -330,15 +330,7 @@ object SharedList {
                     }
                     val phishVer = info.optString("phish_verze")
                     val haveVer = p.getString("phish_verze", null)
-                    val wifi = !(app.getSystemService(ConnectivityManager::class.java)?.isActiveNetworkMetered ?: true)
-                    val old = System.currentTimeMillis() - p.getLong("phish_cas", 0L) > 7 * DAY
-                    if (phishVer.isNotEmpty() && phishVer != haveVer && (wifi || old || force)) {
-                        get(LIST_URL + "phish.bin", 30_000)?.takeIf { it.size % 5 == 0 }?.let {
-                            save(app, "phish.bin", it)
-                            phish = null
-                            p.edit().putString("phish_verze", phishVer).putLong("phish_cas", System.currentTimeMillis()).apply()
-                        }
-                    }
+                    if (phishVer.isNotEmpty() && phishVer != haveVer) updatePhish(app, info, haveVer, force)
                     p.edit().putLong("stazeno", System.currentTimeMillis()).apply()
                     ok = true
                 }
@@ -347,6 +339,81 @@ object SharedList {
             }
             if (onDone != null) Handler(Looper.getMainLooper()).post { onDone(ok) }
         }
+    }
+
+    /**
+     * Světový seznam: každý den se stáhnou jen přírůstky (pár kilobajtů, klidně přes mobilní data).
+     * Celý seznam (asi 2 MB) jen poprvé, nebo když telefon byl dlouho bez internetu a přírůstky nenavazují.
+     */
+    private fun updatePhish(app: Context, info: JSONObject, haveVer: String?, force: Boolean) {
+        val p = prefs(app)
+        val target = info.optString("phish_verze")
+        val expected = info.optInt("phish_prefixu", -1)
+        val have = File(dir(app), "phish.bin")
+        if (haveVer != null && have.exists()) {
+            val chain = info.optJSONArray("phish_retez") ?: JSONArray()
+            var ver: String = haveVer
+            var data: LongArray? = null
+            var steps = 0
+            while (ver != target && steps < 60) {
+                steps++
+                val link = (0 until chain.length()).map { chain.getJSONObject(it) }.firstOrNull { it.optString("z") == ver } ?: break
+                val day = link.getString("den")
+                val change = get(LIST_URL + "zmeny/$day.bin") ?: break
+                if (data == null) data = toLongs(have.readBytes())
+                data = applyChange(data, change) ?: break
+                ver = day
+            }
+            if (ver == target && data != null && (expected < 0 || data.size == expected)) {
+                save(app, "phish.bin", fromLongs(data))
+                phish = null
+                p.edit().putString("phish_verze", target).putLong("phish_cas", System.currentTimeMillis()).apply()
+                return
+            }
+        }
+        // Přírůstky nenavazují: celý seznam. Přes mobilní data nejvýš jednou za týden (kromě úplně prvního stažení).
+        val wifi = !(app.getSystemService(ConnectivityManager::class.java)?.isActiveNetworkMetered ?: true)
+        val first = !have.exists()
+        val old = System.currentTimeMillis() - p.getLong("phish_cas", 0L) > 7 * DAY
+        if (!(first || wifi || old || force)) return
+        get(LIST_URL + "phish.bin", 30_000)?.takeIf { it.size % 5 == 0 }?.let {
+            save(app, "phish.bin", it)
+            phish = null
+            p.edit().putString("phish_verze", target).putLong("phish_cas", System.currentTimeMillis()).apply()
+        }
+    }
+
+    private fun toLongs(b: ByteArray): LongArray = LongArray(b.size / 5) { i ->
+        var v = 0L
+        for (k in 0 until 5) v = (v shl 8) or (b[i * 5 + k].toLong() and 0xFF)
+        v
+    }
+
+    private fun fromLongs(a: LongArray): ByteArray {
+        val out = ByteArray(a.size * 5)
+        for (i in a.indices) for (k in 0 until 5) out[i * 5 + k] = (a[i] ushr (8 * (4 - k))).toByte()
+        return out
+    }
+
+    /** Přírůstek: 4 bajty počet přidaných, pak přidané a odebrané otisky po 5 bajtech. */
+    private fun applyChange(data: LongArray, change: ByteArray): LongArray? {
+        if (change.size < 4 || (change.size - 4) % 5 != 0) return null
+        val plusCount = ((change[0].toInt() and 0xFF) shl 24) or ((change[1].toInt() and 0xFF) shl 16) or
+            ((change[2].toInt() and 0xFF) shl 8) or (change[3].toInt() and 0xFF)
+        val all = toLongs(change.copyOfRange(4, change.size))
+        if (plusCount < 0 || plusCount > all.size) return null
+        val minus = HashSet<Long>(all.size - plusCount)
+        for (i in plusCount until all.size) minus.add(all[i])
+        val result = LongArray(data.size + plusCount)
+        var n = 0
+        for (v in data) if (v !in minus) result[n++] = v
+        for (i in 0 until plusCount) result[n++] = all[i]
+        val sorted = result.copyOf(n)
+        sorted.sort()
+        // Bez duplicit
+        var m = 0
+        for (i in sorted.indices) if (i == 0 || sorted[i] != sorted[i - 1]) sorted[m++] = sorted[i]
+        return sorted.copyOf(m)
     }
 
     @Volatile private var running = false
