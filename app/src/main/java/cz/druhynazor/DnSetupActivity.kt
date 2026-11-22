@@ -77,7 +77,7 @@ class DnSetupActivity : Activity() {
             "Na plochu dám obálku Zprávy, která hlídá podvody.",
             "V okénku pak zmáčkněte Přidat."),
         Step("calls", "📞", "Hlídání hovorů",
-            "Budu hlídat hovory, abych poznala podvodníka dřív, než zvednete.",
+            "Budu hlídat hovory, abych poznala podvodníka dřív, než zvednete telefon.",
             "V okénku pak vyberte Postaráno a vpravo dole stiskněte Změnit na výchozí."),
         Step("overlay", "🚨", "Varování při hovoru",
             "Když volá podvodník, ukážu přes celou obrazovku červené varování.",
@@ -122,6 +122,7 @@ class DnSetupActivity : Activity() {
     override fun onPause() {
         super.onPause()
         paused = true
+        BackGuide.uiVisible = false
         // Nezastavovat hlas: právě říká, kam v okénku telefonu ťuknout.
     }
 
@@ -158,7 +159,7 @@ class DnSetupActivity : Activity() {
         var n = 0
         val say = object : Runnable {
             override fun run() {
-                if (!awaiting) return
+                if (!awaiting || BackGuide.active) return
                 speaker.say(text)
                 if (++n < times) sayer.postDelayed(this, repeatMs)
             }
@@ -168,6 +169,7 @@ class DnSetupActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        BackGuide.uiVisible = true
         // Hlídání okének (watchState) se zastaví samo, až evaluate() ukončí čekání.
         paused = false
         if (permsGranted(this)) GuardService.start(this)
@@ -340,6 +342,7 @@ class DnSetupActivity : Activity() {
                 startActivity(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:$packageName")))
             } else { awaiting = false; next() }
             "chats" -> {
+                BackGuide.expect(this)
                 // Rovnou na přepínač Postaráno, ne na seznam všech aplikací
                 val direct = if (Build.VERSION.SDK_INT >= 30)
                     Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).putExtra(
@@ -378,6 +381,9 @@ class DnSetupActivity : Activity() {
                     val now = perms().count { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
                     if (now > granted && now < perms().size) guide(listOf("Výborně. Teď zase stiskněte Povolit."))
                     granted = now
+                } else if (id == "chats") {
+                    // Vyvedení ven řeší BackGuide z ChatWatcher (aplikace může být mezitím ukončená)
+                    if (isDone(this@DnSetupActivity, id)) return
                 } else if (paused && isDone(this@DnSetupActivity, id)) {
                     val t = System.currentTimeMillis()
                     if (doneAt == 0L) { doneAt = t; comeBack() }

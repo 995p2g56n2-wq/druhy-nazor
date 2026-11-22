@@ -20,6 +20,12 @@ import android.util.Log
 class ChatWatcher : NotificationListenerService() {
 
     private val handler = Handler(Looper.getMainLooper())
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        // Právě povoleno v průvodci: vyvést seniora z nastavení zpátky
+        BackGuide.afterGrant(this)
+    }
     private val seen = LinkedHashSet<Int>()
 
     private var callKey: String? = null
