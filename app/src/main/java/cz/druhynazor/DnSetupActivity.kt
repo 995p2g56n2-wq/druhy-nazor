@@ -413,12 +413,13 @@ class DnSetupActivity : Activity() {
                     val now = perms().count { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
                     if (now > granted && now < perms().size) guide(listOf("Výborně. Teď zase stiskněte Povolit."))
                     granted = now
-                } else if (id == "chats") {
-                    // Vyvedení ven řeší BackGuide z ChatWatcher (aplikace může být mezitím ukončená)
-                    if (isDone(this@DnSetupActivity, id)) return
                 } else if (paused && isDone(this@DnSetupActivity, id)) {
                     val t = System.currentTimeMillis()
-                    if (doneAt == 0L) { doneAt = t; comeBack() }
+                    // Hotovo: hned přestat opakovat původní pokyn („najděte Postaráno…“)
+                    if (doneAt == 0L) { doneAt = t; sayer.removeCallbacksAndMessages(null); comeBack() }
+                    // U WhatsAppu vyvádí ven BackGuide z ChatWatcher (funguje, i když telefon
+                    // aplikaci ukončí). Když se do 3 s neozval, navedeme na šipku sami.
+                    else if (id == "chats" && (BackGuide.active || t - doneAt < 3000)) { }
                     else if (t - doneAt > 1500 && backSaid == 0) {
                         backSaid = 1
                         guide(listOf("Teď zmáčkněte šipku vlevo nahoře."), repeatMs = 8000, times = 1)
