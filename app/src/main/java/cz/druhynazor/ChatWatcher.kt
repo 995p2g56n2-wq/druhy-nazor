@@ -60,7 +60,7 @@ class ChatWatcher : NotificationListenerService() {
         if (!seen.add(fingerprint)) return
         if (seen.size > 200) seen.remove(seen.first())
 
-        val result = ScamCheck.check(text)
+        val result = SharedList.check(this, text, null)
         if (result.level == ScamCheck.Level.OK) return
 
         val prefs = Prefs(this)
@@ -73,6 +73,8 @@ class ChatWatcher : NotificationListenerService() {
         }
         val id = 5000 + (fingerprint and 0xFFFF)
         val key = Verdicts.keyForText("$title ($app)", text)
+        // U chatů se hlásí jen odkazy (jméno v chatu není číslo)
+        SharedList.rememberSubject(this, key, null, text)
 
         if (result.level == ScamCheck.Level.SCAM) {
             Notify.show(this, id, Notify.CH_WARN, "⚠️ Pozor, podvod na $app",
@@ -119,7 +121,7 @@ class ChatWatcher : NotificationListenerService() {
         handler.postDelayed(longCall, prefs.longCallMinutes * 60_000L)
         Log.i("DruhyNazor", "Hovor přes $app z neznámého čísla $title")
 
-        if (prefs.isTestScamNumber(title)) {
+        if (SharedList.isScamNumber(this, title)) {
             val tap = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             Notify.show(this, Notify.ID_CALL_WARN, Notify.CH_WARN, "⚠️ POZOR, PODVODNÍK",
                 "Přes $app volá číslo nahlášené jako podvod: $title.", tap, Color.RED)

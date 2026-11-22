@@ -2,7 +2,7 @@ package cz.druhynazor
 
 /**
  * Jednoduchá kontrola zpráv přímo v telefonu (nic se nikam neposílá).
- * Ve skutečné aplikaci se tato pravidla budou stahovat ze serveru a aktualizovat podle aktuálních podvodů.
+ * Společný seznam podvodných čísel a stránek ze serveru přidává SharedList.
  *
  * Reklama od známého odesílatele (Tesco Mobile, CCC, Kaufland…) rodinu neruší. Jméno odesílatele
  * ale podvodník umí napodobit, proto se nevěří samotnému jménu: odkaz ve zprávě musí vést
@@ -134,6 +134,25 @@ object ScamCheck {
             .map { siteOf(it.groupValues[1]) }
             .filter { s -> s.substringBefore('.').any { it.isLetter() } }
             .toSet()
+
+    /** Odkaz ve zprávě: celá adresa stránky (bez „www.“) a cesta za ní. */
+    data class Link(val host: String, val path: String)
+
+    /** Všechny odkazy ve zprávě i s celou adresou (pro kontrolu ve společném seznamu podvodů). */
+    fun links(text: String): List<Link> =
+        linkRegex.findAll(text)
+            .filter { m ->
+                val tld = m.groupValues[1].substringAfterLast('.').lowercase()
+                tld !in wordTlds || '/' in m.value || m.value.startsWith("http", true) || m.value.startsWith("www.", true)
+            }
+            .map { m ->
+                val host = m.groupValues[1].lowercase().trimEnd('.').removePrefix("www.")
+                val rest = m.value.substring(m.groups[1]!!.range.last + 1 - m.range.first)
+                val path = rest.replace(Regex("^:\\d+"), "").trimEnd('.', ',', ';', ':', '!', '?', ')', '"', '\'')
+                Link(host, path)
+            }
+            .filter { l -> l.host.split('.').dropLast(1).lastOrNull()?.any { it.isLetter() } == true }
+            .toList()
 
     private val wordTlds = setOf("to", "me", "in", "co", "at", "de", "us", "tv", "ly", "cc", "su", "ws", "io", "app", "fun", "life", "live", "info")
 

@@ -75,6 +75,8 @@ object Verdicts {
         // Rodina schválila SMS od odesílatele se jménem: příště už jeho reklamu nehlásit
         if (ok && key.startsWith("s")) key.drop(1).toLongOrNull()?.let { SmsStore.byId(ctx, it) }
             ?.let { TrustedSenders.learn(ctx, it.address, it.body) }
+        // Společný seznam: podvod nahlásit (aby varoval i ostatní), „v pořádku“ hlášení oslabí
+        val shared = SharedList.onVerdict(ctx, key, scam = !ok)
         val who = byName ?: prefsMain.familyName
         val tap = Intent(ctx, DruhyNazorActivity::class.java)
             .putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true)
@@ -86,7 +88,8 @@ object Verdicts {
 
         val senior = prefsMain.seniorName
         val result = if (ok) "$senior uvidí, že je zpráva v pořádku, a odkaz půjde otevřít."
-                     else "$senior uvidí, že je to potvrzený podvod."
+                     else "$senior uvidí, že je to potvrzený podvod." +
+                         if (shared) " Číslo a odkazy jsme nahlásili do společného seznamu, aby varovaly i ostatní rodiny." else ""
         if (byNumber != null) {
             Family.sendSms(ctx, byNumber, "Postaráno: Díky. $result")
             Family.sms(ctx, "Postaráno: Vyřízeno. $who napsal(a): ${if (ok) "zpráva je v pořádku" else "je to podvod"}. Nemusíte nic dělat.", except = byNumber)

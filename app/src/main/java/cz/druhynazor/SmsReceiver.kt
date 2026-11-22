@@ -29,7 +29,7 @@ class SmsReceiver : BroadcastReceiver() {
         val prefs = Prefs(context)
         // Zpráva od někoho z rodiny se nekontroluje (jinak by se rodina ptala sama sebe)
         val result = if (prefs.familyByNumber(address) != null) ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())
-                     else TrustedSenders.check(context, body, address)
+                     else SharedList.check(context, body, address)
         val open = Intent(context, MessageActivity::class.java).apply {
             putExtra(MessageActivity.EXTRA_ID, id ?: -1L)
             putExtra(MessageActivity.EXTRA_ADDRESS, address)
@@ -40,6 +40,7 @@ class SmsReceiver : BroadcastReceiver() {
         open.putExtra(MessageActivity.EXTRA_KEY, key)
         val notifId = 1000 + ((id ?: System.currentTimeMillis()) % 100_000).toInt()
 
+        if (result.level != ScamCheck.Level.OK) SharedList.rememberSubject(context, key, address, body)
         when (result.level) {
             ScamCheck.Level.SCAM -> {
                 Notify.show(context, notifId, Notify.CH_WARN, "⚠️ Pozor, podvod",

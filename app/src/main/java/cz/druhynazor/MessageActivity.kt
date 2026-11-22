@@ -47,7 +47,7 @@ class MessageActivity : Activity() {
         val verdict = if (incoming && !fromFamily) Verdicts.get(this, key) else null
 
         if (body.isNotEmpty()) {
-            val result = if (incoming && !fromFamily) TrustedSenders.check(this, body, address) else ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())
+            val result = if (incoming && !fromFamily) SharedList.check(this, body, address) else ScamCheck.Result(ScamCheck.Level.OK, "", emptyList())
             if (incoming) {
                 val family = Verdicts.decidedBy(this, key) ?: prefs.familyName
                 val (c, head, advice, extra) = when {

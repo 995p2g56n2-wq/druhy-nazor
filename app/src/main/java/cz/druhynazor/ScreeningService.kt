@@ -22,11 +22,11 @@ class ScreeningService : CallScreeningService() {
             Call.Details.DIRECTION_INCOMING -> {
                 prefs.lastUnknownNumber = number
                 prefs.lastUnknownTime = System.currentTimeMillis()
-                prefs.ringingScam = prefs.isTestScamNumber(number)
+                prefs.ringingScam = SharedList.isScamNumber(this, number)
                 if (Prefs.isForeign(number)) prefs.rememberForeignCaller(number)
                 Log.i("DruhyNazor", "Příchozí hovor z neznámého čísla: $number")
 
-                if (prefs.isTestScamNumber(number)) {
+                if (SharedList.isScamNumber(this, number)) {
                     if (prefs.blockScamCalls) {
                         block = true
                         prefs.lastUnknownTime = 0L
@@ -50,7 +50,7 @@ class ScreeningService : CallScreeningService() {
 
             Call.Details.DIRECTION_OUTGOING -> {
                 val reason = when {
-                    prefs.isTestScamNumber(number) -> ScamCallActivity.REASON_SCAM
+                    SharedList.isScamNumber(this, number) -> ScamCallActivity.REASON_SCAM
                     Prefs.isForeign(number) && prefs.foreignCallerRecently(number) -> ScamCallActivity.REASON_FOREIGN
                     else -> null
                 }

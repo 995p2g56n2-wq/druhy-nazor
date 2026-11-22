@@ -66,6 +66,7 @@ class GuardService : Service() {
         }
         listen()
         Verdicts.startListening(this)
+        SharedList.startUpdates(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
@@ -157,6 +158,7 @@ class GuardService : Service() {
             }
         }
         Verdicts.stopListening()
+        SharedList.stopUpdates()
         super.onDestroy()
     }
 
