@@ -4,7 +4,9 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -35,7 +37,7 @@ import kotlin.concurrent.thread
  */
 class LetterActivity : Activity() {
 
-    private enum class Screen { SCAN, READING, RESULT, UNREADABLE, MORE, REMIND }
+    private enum class Screen { SCAN, CHOOSE, READING, RESULT, UNREADABLE, MORE, REMIND }
 
     private var screen = Screen.SCAN
     private lateinit var speaker: Speaker
@@ -55,7 +57,82 @@ class LetterActivity : Activity() {
             if (s == null) { finish(); return }
             saved = s; screen = Screen.REMIND; render(); return
         }
-        if (savedInstanceState == null) scan() else render()
+        if (savedInstanceState != null) { render(); return }
+        // Dopis poslaný z jiné aplikace (Fotky, Soubory, e-mail): rovnou přečíst
+        val shared = sharedUris(intent)
+        if (shared.isNotEmpty()) openFiles(shared) else scan()
+    }
+
+    private fun sharedUris(i: Intent?): List<Uri> {
+        if (i == null) return emptyList()
+        @Suppress("DEPRECATION")
+        return when (i.action) {
+            Intent.ACTION_SEND -> listOfNotNull(i.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
+            Intent.ACTION_SEND_MULTIPLE -> i.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM) ?: emptyList()
+            Intent.ACTION_VIEW -> listOfNotNull(i.data)
+            else -> emptyList()
+        }
+    }
+
+    // ---------- Z Fotek nebo Souborů ----------
+
+    /** Výběr fotky nebo PDF (pro zdatnější, senior má velký fotoaparát). */
+    private fun pick() {
+        val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*")
+            .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "application/pdf"))
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(i, REQ_PICK)
+        } catch (e: Exception) {
+            Log.w("DruhyNazor", "Výběr souboru se neotevřel", e)
+        }
+    }
+
+    /** Fotky se čtou rovnou, PDF se nejdřív převede na obrázky stran (nejvýš 5 stran). */
+    private fun openFiles(uris: List<Uri>) {
+        screen = Screen.READING
+        spoken = null
+        render()
+        thread(name = "dopis-soubory") {
+            val out = mutableListOf<Uri>()
+            for (u in uris) {
+                if (out.size >= MAX_PAGES) break
+                val type = try { contentResolver.getType(u) } catch (e: Exception) { null } ?: ""
+                if (type == "application/pdf" || u.toString().lowercase().endsWith(".pdf")) out += pdfPages(u, MAX_PAGES - out.size)
+                else out += u
+            }
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                pages = out
+                if (pages.isEmpty()) { screen = Screen.UNREADABLE; spoken = null; render() } else readPages()
+            }
+        }
+    }
+
+    private fun pdfPages(u: Uri, max: Int): List<Uri> = try {
+        val dir = File(cacheDir, "dopis-pdf").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
+        contentResolver.openFileDescriptor(u, "r")!!.use { fd ->
+            PdfRenderer(fd).use { pdf ->
+                (0 until minOf(pdf.pageCount, max)).map { n ->
+                    pdf.openPage(n).use { page ->
+                        // Asi 200 DPI: dost ostré na čtení, ne moc velké
+                        val scale = 2000f / maxOf(page.width, page.height)
+                        val bmp = Bitmap.createBitmap((page.width * scale).toInt(), (page.height * scale).toInt(), Bitmap.Config.ARGB_8888)
+                        bmp.eraseColor(android.graphics.Color.WHITE)
+                        page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        val f = File(dir, "strana-${System.currentTimeMillis()}-$n.jpg")
+                        f.outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+                        bmp.recycle()
+                        Uri.fromFile(f)
+                    }
+                }
+            }
+        }
+    } catch (e: Exception) {
+        Log.w("DruhyNazor", "PDF se nepodařilo otevřít", e)
+        emptyList()
     }
 
     override fun onPause() { super.onPause(); BackGuide.uiVisible = false; speaker.stop() }
@@ -96,11 +173,18 @@ class LetterActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_PICK) {
+            if (resultCode != RESULT_OK || data == null) { if (letter == null) go(Screen.CHOOSE); return }
+            val uris = data.clipData?.let { c -> (0 until c.itemCount).map { c.getItemAt(it).uri } } ?: listOfNotNull(data.data)
+            if (uris.isNotEmpty()) { resetLetter(); openFiles(uris) }
+            return
+        }
         if (requestCode != REQ_SCAN) return
-        if (resultCode != RESULT_OK) { finish(); return } // senior fotoaparát zavřel: zpátky domů, nic se neděje
+        // Fotoaparát zavřený: nabídnout znovu vyfotit, vybrat z Fotek nebo Souborů, nebo Zpět
+        if (resultCode != RESULT_OK) { go(Screen.CHOOSE); return }
         val result = GmsDocumentScanningResult.fromActivityResultIntent(data)
         pages = result?.pages?.map { it.imageUri } ?: emptyList()
-        if (pages.isEmpty()) { finish(); return }
+        if (pages.isEmpty()) { go(Screen.CHOOSE); return }
         screen = Screen.READING
         render()
         readPages()
@@ -157,6 +241,7 @@ class LetterActivity : Activity() {
         val root = Ui.column(this, 20, 16).apply { setBackgroundColor(Ui.BG) }
         when (screen) {
             Screen.SCAN -> scanScreen(root)
+            Screen.CHOOSE -> choose(root)
             Screen.READING -> reading(root)
             Screen.RESULT -> result(root)
             Screen.UNREADABLE -> unreadable(root)
@@ -175,6 +260,22 @@ class LetterActivity : Activity() {
         root.addView(Ui.text(this, "Vyfotí se sám. Pak ťukněte dole na Hotovo.", 22f, center = true))
         say("Namiřte telefon na dopis. Vyfotí se sám. Pak ťukněte dole na Hotovo.")
     }
+
+    private fun choose(root: LinearLayout) {
+        spacer(root, 50)
+        root.addView(Ui.text(this, "📄", 80f, center = true))
+        root.addView(Ui.text(this, "Přečtu vám dopis.", 28f, bold = true, center = true))
+        val next = "Teď ťukněte dole na Vyfotit dopis."
+        root.addView(Ui.text(this, next, 22f, center = true))
+        say("Přečtu vám dopis. $next")
+        spacer(root, 16)
+        root.addView(Ui.text(this, "👇", 40f, center = true))
+        root.addView(Ui.button(this, "📷  Vyfotit dopis") { resetLetter(); scan() })
+        root.addView(Ui.button(this, "🖼️  Vybrat z Fotek nebo Souborů", Ui.CARD, Ui.INK, sp = 18f) { pick() })
+        root.addView(Ui.button(this, "Zpět", Ui.BG, Ui.MUTED, sp = 17f) { finish() })
+    }
+
+    private fun resetLetter() { letter = null; saved = null; pages = emptyList(); sentToFamily = false; reminded = false }
 
     private fun reading(root: LinearLayout) {
         spacer(root, 80)
@@ -195,6 +296,7 @@ class LetterActivity : Activity() {
         spacer(root, 16)
         root.addView(Ui.text(this, "👇", 40f, center = true))
         root.addView(Ui.button(this, "Vyfotit znovu") { pages = emptyList(); scan() })
+        root.addView(Ui.button(this, "Vybrat z Fotek nebo Souborů", Ui.CARD, Ui.INK, sp = 18f) { pick() })
         if (hasPhoto && Prefs(this).familyContacts.isNotEmpty()) {
             root.addView(Ui.button(this, "Poslat fotku rodině", Ui.CARD, Ui.INK) {
                 Mms.sendPhoto(this, pages.first(), "Postaráno: ${Prefs(this).seniorName} posílá fotku dopisu, který jsem nepřečetla.")
@@ -255,9 +357,8 @@ class LetterActivity : Activity() {
         root.addView(Ui.button(this, "Hotovo", if (canRemind || (family && !sentToFamily)) Ui.CARD else Ui.ACCENT,
             if (canRemind || (family && !sentToFamily)) Ui.INK else android.graphics.Color.WHITE) { finish() })
         root.addView(Ui.button(this, "Více", Ui.BG, Ui.MUTED, sp = 17f) { go(Screen.MORE) })
-        root.addView(Ui.button(this, "Vyfotit další dopis", Ui.BG, Ui.MUTED, sp = 17f) {
-            letter = null; pages = emptyList(); sentToFamily = false; reminded = false; scan()
-        })
+        root.addView(Ui.button(this, "Vyfotit další dopis", Ui.BG, Ui.MUTED, sp = 17f) { resetLetter(); scan() })
+        root.addView(Ui.button(this, "Vybrat z Fotek nebo Souborů", Ui.BG, Ui.MUTED, sp = 17f) { pick() })
     }
 
     private fun more(root: LinearLayout) {
@@ -342,6 +443,8 @@ class LetterActivity : Activity() {
     companion object {
         const val EXTRA_REMIND = "pripominka"
         private const val REQ_SCAN = 41
+        private const val REQ_PICK = 42
+        private const val MAX_PAGES = 5
 
         fun scanner(): GmsDocumentScanner = GmsDocumentScanning.getClient(
             GmsDocumentScannerOptions.Builder()

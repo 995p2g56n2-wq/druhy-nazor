@@ -25,7 +25,7 @@ object Mms {
     fun sendPhoto(ctx: Context, photo: Uri, text: String) {
         val prefs = Prefs(ctx)
         val jpeg = try {
-            if (photo.scheme == "file") File(photo.path!!).readBytes()
+            if (photo.scheme == "file" && File(photo.path!!).length() <= 290_000) File(photo.path!!).readBytes()
             else {
                 val tmp = File(ctx.cacheDir, "mms-foto.jpg")
                 LetterStore.smallPhoto(ctx, photo, tmp)?.let { File(it).readBytes() } ?: return
