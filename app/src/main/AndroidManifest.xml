@@ -64,10 +64,21 @@
         <activity android:name=".MessageActivity" android:exported="false" />
         <activity
             android:name=".LetterActivity"
-            android:exported="false"
+            android:exported="true"
+            android:label="Přečíst dopis"
+            android:icon="@drawable/ic_shield"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
-            android:screenOrientation="portrait" />
+            android:screenOrientation="portrait">
+            <!-- Dopis poslaný z Fotek, Souborů nebo e-mailu přes Sdílet -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+        </activity>
 
         <receiver android:name=".LetterReminderReceiver" android:exported="false" />
         <receiver android:name=".MmsSentReceiver" android:exported="false" />
