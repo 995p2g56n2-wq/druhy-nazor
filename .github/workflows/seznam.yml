@@ -6,6 +6,10 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_dispatch:
+  # Když se do server/vyjimky.txt přidá vyřazené číslo, zveřejnit opravený seznam hned
+  push:
+    branches: [main]
+    paths: ["server/vyjimky.txt", "server/seznam.py"]
   # Při úpravě serveru vyzkoušet hned v návrhu změn
   pull_request:
     paths: ["server/**", ".github/workflows/seznam.yml"]

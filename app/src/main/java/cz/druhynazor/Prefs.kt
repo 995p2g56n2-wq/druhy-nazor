@@ -51,6 +51,16 @@ class Prefs(context: Context) {
         return familyContacts.firstOrNull { normalize(it.phone) == n }
     }
 
+    /** Verze souhlasu, kterou senior odsouhlasil (0 = zatím nic). */
+    var consentVersion: Int
+        get() = p.getInt("souhlas_verze", 0)
+        set(v) = p.edit().putInt("souhlas_verze", v).apply()
+
+    /** Hlásit čísla podvodníků do společného seznamu (jde vypnout v Pro rodinu). */
+    var shareReports: Boolean
+        get() = p.getBoolean("hlasit_do_seznamu", true)
+        set(v) = p.edit().putBoolean("hlasit_do_seznamu", v).apply()
+
     /** Telefon umí mluvit česky (hlasem Google). */
     var voiceOk: Boolean
         get() = d.getBoolean("voice_ok", false)

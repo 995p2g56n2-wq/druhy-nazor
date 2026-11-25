@@ -4,9 +4,11 @@
     <cloud-backup>
         <include domain="sharedpref" path="." />
         <exclude domain="sharedpref" path="zarizeni.xml" />
+        <exclude domain="sharedpref" path="dopisy.xml" />
     </cloud-backup>
     <device-transfer>
         <include domain="sharedpref" path="." />
         <exclude domain="sharedpref" path="zarizeni.xml" />
+        <exclude domain="sharedpref" path="dopisy.xml" />
     </device-transfer>
 </data-extraction-rules>

@@ -219,6 +219,8 @@ object SharedList {
         num?.let { update("rodina_cisla", listOf(it)) }
         update("rodina_weby", webs)
 
+        // Senior hlášení do společného seznamu vypnul: rozhodnutí platí jen v tomto telefonu
+        if (!Prefs(ctx).shareReports) return false
         val queue = JSONArray(p.getString("fronta", null) ?: "[]")
         num?.let { queue.put(JSONObject().put("t", "n").put("x", it).put("r", if (scam) "s" else "o")) }
         webs.forEach { queue.put(JSONObject().put("t", "w").put("x", it).put("r", if (scam) "s" else "o")) }
@@ -256,6 +258,7 @@ object SharedList {
         thread(name = "seznam-hlaseni") {
             try {
                 val p = prefs(app)
+                if (!Prefs(app).shareReports) { p.edit().remove("fronta").apply(); return@thread }
                 val queue = JSONArray(p.getString("fronta", null) ?: "[]")
                 val id = installId(app)
                 var sent = 0

@@ -1,0 +1,10 @@
+# Výjimky ze společného seznamu podvodů
+#
+# Čísla a stránky, které tu jsou, se nikdy nezveřejní (ani když je nahlásí víc telefonů)
+# a server je při příštím běhu (do 15 minut) vymaže i ze všech hlášení.
+# Sem patří čísla, která se do seznamu dostala omylem a jejich majitel požádal o vyřazení.
+#
+# Jedno číslo nebo stránka na řádek. Za # může být poznámka, třeba kdy a kdo o to požádal.
+# Příklady:
+#   777 123 456      # požádal 25. 11. 2026 e-mailem
+#   priklad-obchod.cz
