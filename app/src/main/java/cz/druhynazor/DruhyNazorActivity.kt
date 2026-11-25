@@ -1,8 +1,6 @@
 package cz.druhynazor
 
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Bundle
 import android.text.format.DateFormat
@@ -37,7 +35,6 @@ class DruhyNazorActivity : Activity() {
         super.onResume()
         if (DnSetupActivity.permsGranted(this)) GuardService.start(this)
         render()
-        Verdicts.pollNow(this) { changed -> if (changed && !isFinishing) render() }
     }
 
     private fun render() {
@@ -106,7 +103,6 @@ class DruhyNazorActivity : Activity() {
         }
 
         root.addView(FamilyUi.card(this) { render() })
-        root.addView(ntfyCard(prefs))
 
         // ---- Jak seniorovi říkají ----
         val call = Ui.card(this)
@@ -179,37 +175,6 @@ class DruhyNazorActivity : Activity() {
         cfg.addView(Ui.text(this, "Verze aplikace: $version", 15f, color = Ui.MUTED))
         root.addView(cfg)
         show(root)
-    }
-
-    /** Nepovinná aplikace ntfy pro rodinu: upozornění hned a odpověď jedním ťuknutím na tlačítko. */
-    private fun ntfyCard(prefs: Prefs): View {
-        val c = Ui.card(this)
-        c.addView(Ui.text(this, "Upozornění s tlačítky (ntfy)", 22f, bold = true))
-        c.addView(Ui.text(this,
-            "Nepovinné. Kdo z rodiny si do svého mobilu nainstaluje aplikaci ntfy, dostane upozornění hned " +
-            "a odpoví jedním ťuknutím na tlačítko „Je to v pořádku“ nebo „Je to podvod“. SMS chodí dál.", 17f, color = Ui.MUTED))
-        c.addView(android.widget.CheckBox(this).apply {
-            text = "Posílat upozornění i do aplikace ntfy"
-            textSize = 17f
-            setTextColor(Ui.INK)
-            isChecked = prefs.ntfyEnabled
-            setOnCheckedChangeListener { _, on -> prefs.ntfyEnabled = on; render() }
-        })
-        if (!prefs.ntfyEnabled) return c
-        if (prefs.familyContacts.isNotEmpty()) {
-            c.addView(Ui.button(this, "Poslat rodině SMS s návodem na ntfy", Ui.CARD, Ui.ACCENT, sp = 17f) {
-                Family.sms(this, Family.ntfyInviteText(this))
-                Toast.makeText(this, "Odesláno. Návod jim přišel v SMS.", Toast.LENGTH_LONG).show()
-            })
-        }
-        c.addView(Ui.text(this, "Název kanálu, který si v ntfy přihlásí:", 16f, color = Ui.MUTED))
-        c.addView(Ui.text(this, prefs.familyChannel, 20f, bold = true, color = Ui.ACCENT).apply { setTextIsSelectable(true) })
-        c.addView(Ui.button(this, "Zkopírovat název kanálu", Ui.CARD, Ui.ACCENT, sp = 17f) {
-            getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("kanal", prefs.familyChannel))
-            Toast.makeText(this, "Zkopírováno", Toast.LENGTH_SHORT).show()
-        })
-        c.addView(Ui.text(this, "Pak to vyzkoušejte tlačítkem Vyzkoušet s rodinou výš.", 16f, color = Ui.MUTED))
-        return c
     }
 
     @Deprecated("Activity API")
