@@ -3,4 +3,5 @@
 <full-backup-content>
     <include domain="sharedpref" path="." />
         <exclude domain="sharedpref" path="zarizeni.xml" />
+        <exclude domain="sharedpref" path="dopisy.xml" />
 </full-backup-content>

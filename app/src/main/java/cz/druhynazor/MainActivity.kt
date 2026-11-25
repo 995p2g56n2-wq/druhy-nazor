@@ -22,7 +22,7 @@ import cz.druhynazor.Ui.dp
  */
 class MainActivity : Activity() {
 
-    private enum class Screen { START, FAMILY, CALL, DONE, HOME }
+    private enum class Screen { START, CONSENT, FAMILY, CALL, DONE, HOME }
 
     private var screen = Screen.HOME
     private var manualShown = false
@@ -34,6 +34,8 @@ class MainActivity : Activity() {
         Notify.setup(this)
         speaker = Speaker(this)
         screen = if (Modules.onboarded(this)) Screen.HOME else Screen.START
+        // Kdo ochranu zapnul ve starší verzi, odsouhlasí to jednou teď
+        if (screen == Screen.HOME && !consented()) screen = Screen.CONSENT
         // Mluvit už od výběru rodiny: zjistit hned, jestli telefon umí česky
         if (screen == Screen.START) Voice.check(this) { ok -> Prefs(this).voiceOk = ok }
         handleSendTo(intent)
@@ -82,6 +84,7 @@ class MainActivity : Activity() {
     @Deprecated("Activity API")
     override fun onBackPressed() {
         when (screen) {
+            Screen.CONSENT -> if (Modules.onboarded(this)) { @Suppress("DEPRECATION") super.onBackPressed() } else go(Screen.START)
             Screen.FAMILY -> go(Screen.START)
             Screen.CALL -> go(Screen.FAMILY)
             Screen.DONE -> go(Screen.HOME)
@@ -96,6 +99,7 @@ class MainActivity : Activity() {
         val root = Ui.column(this, 20, 18).apply { setBackgroundColor(Ui.BG) }
         when (screen) {
             Screen.START -> start(root)
+            Screen.CONSENT -> consent(root)
             Screen.FAMILY -> familyScreen(root)
             Screen.CALL -> callScreen(root)
             Screen.DONE -> done(root)
@@ -120,9 +124,43 @@ class MainActivity : Activity() {
         spacer(root, 40)
         root.addView(Ui.text(this, "👇", 44f, center = true))
         root.addView(Ui.button(this, "Zapnout ochranu", sp = 24f) {
-            // Rodina se obnovila ze zálohy (nový telefon): rovnou na povolení
-            if (Prefs(this).familyContacts.isNotEmpty()) startSetup() else go(Screen.FAMILY)
+            if (consented()) afterConsent() else go(Screen.CONSENT)
         })
+    }
+
+    private fun afterConsent() {
+        when {
+            Modules.onboarded(this) -> go(Screen.HOME)
+            // Rodina se obnovila ze zálohy (nový telefon): rovnou na povolení
+            Prefs(this).familyContacts.isNotEmpty() -> startSetup()
+            else -> go(Screen.FAMILY)
+        }
+    }
+
+    // ---------- 1b. Souhlas ----------
+
+    private fun consented() = Prefs(this).consentVersion >= CONSENT_VERSION
+
+    private fun consent(root: LinearLayout) {
+        spacer(root, 24)
+        root.addView(Ui.text(this, "🤝", 64f, center = true))
+        root.addView(Ui.text(this, "Než začneme", 30f, bold = true, center = true))
+        val say = "Postaráno hlídá vaše zprávy, hovory a dopisy přímo v telefonu. " +
+            "Když přijde podvod, pošle SMS vybraným lidem z rodiny a číslo podvodníka nahlásí, aby varovalo i ostatní. " +
+            "Teď ťukněte dole na Souhlasím."
+        root.addView(Ui.text(this, say, 21f, center = true))
+        speakDone(say)
+        spacer(root, 16)
+        root.addView(Ui.text(this, "👇", 44f, center = true))
+        root.addView(Ui.button(this, "Souhlasím", sp = 24f) {
+            Prefs(this).consentVersion = CONSENT_VERSION
+            afterConsent()
+        })
+        spacer(root, 16)
+        root.addView(Ui.text(this,
+            "Varování je pomůcka a nepozná úplně každý podvod. Text zpráv ani dopisů nikam neposíláme, " +
+                "jen rodině v SMS. Hlášení do společného seznamu jde vypnout v části Pro rodinu.",
+            16f, center = true, color = Ui.MUTED))
     }
 
     // ---------- 2. Komu dáme vědět ----------
@@ -315,6 +353,8 @@ class MainActivity : Activity() {
 
     companion object {
         private const val REQ_DN_SETUP = 20
+        /** Zvýšit, když se změní, co se posílá ven. Senior pak souhlasí znovu. */
+        const val CONSENT_VERSION = 1
         private const val DAY = 24L * 3600 * 1000
     }
 }

@@ -9,6 +9,8 @@ Spouští ho GitHub každých 15 minut (.github/workflows/seznam.yml). Udělá t
    a světový seznam podvodných stránek Phishing.Database (licence MIT).
 4. Zapíše hotové soubory do složky (větev „seznam“), odkud si je telefony stahují.
 
+Čísla a stránky v server/vyjimky.txt se nikdy nezveřejní (vyřazení na žádost).
+
 Server nezná text zpráv, jména ani čísla seniorů. Telefony se poznají jen podle náhodného označení,
 a i to se ukládá jen zahashované. Dokud věc nenahlásí aspoň 3 telefony, ukládá se jen její otisk (hash),
 takže omylem nahlášené číslo kamaráda se nikde neobjeví čitelně.
@@ -57,6 +59,37 @@ PROTECTED_NUMBERS = {
     "974811111",  # Policie ČR, ústředna
 }
 
+# Výjimky: čísla a stránky, které někdo nechal vyřadit (omylem nahlášené). Nikdy se nezveřejní.
+VYJIMKY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vyjimky.txt")
+
+
+def load_exceptions(path: str = VYJIMKY_PATH) -> set:
+    out = set()
+    if not os.path.exists(path):
+        return out
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            v = line.split("#", 1)[0].strip().lower()
+            if not v:
+                continue
+            digits = re.sub(r"[\s+()-]", "", v)
+            if digits.isdigit():
+                if len(digits) >= 9:
+                    out.add(digits[-9:])   # stejně jako aplikace: posledních 9 číslic
+            else:
+                v = re.sub(r"^https?://", "", v).removeprefix("www.").rstrip("/")
+                out.add(v)
+    return out
+
+
+EXCEPTIONS = load_exceptions()
+
+
+def excepted(x: str) -> bool:
+    host = x.split("/")[0]
+    return x in EXCEPTIONS or host in EXCEPTIONS or any(host.endswith("." + e) for e in EXCEPTIONS if "." in e)
+
+
 HOST_RE = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$")
 
 
@@ -69,6 +102,8 @@ def protected_host(host: str) -> bool:
 
 
 def valid_item(t: str, x: str) -> bool:
+    if excepted(x):
+        return False
     if t == "n":
         return bool(re.fullmatch(r"\d{9}", x)) and x not in PROTECTED_NUMBERS
     if t == "w":
@@ -141,9 +176,13 @@ def apply_reports(state: dict, lines, now: int) -> int:
         if scam >= MIN_REPORTERS:
             it["x"] = x              # čitelně až po 3 nezávislých hlášeních
         counted += 1
-    # Úklid: stará hlášení a staré denní limity
+    # Úklid: stará hlášení, vyřazená čísla a stránky, staré denní limity
     limit = now - WINDOW_DAYS * 86400
+    gone = {sha(f"{t}:{e}")[:32] for e in EXCEPTIONS for t in ("n", "w")}
     for key in list(items):
+        if key in gone or excepted(items[key].get("x", "")):
+            del items[key]
+            continue
         h = {k: v for k, v in items[key]["h"].items() if v[1] >= limit}
         if h:
             items[key]["h"] = h
@@ -160,7 +199,7 @@ def listed(state: dict):
     for it in state.get("polozky", {}).values():
         scam = sum(1 for v in it["h"].values() if v[0] == "s")
         ok = sum(1 for v in it["h"].values() if v[0] == "o")
-        if "x" in it and scam >= MIN_REPORTERS and scam > 2 * ok:
+        if "x" in it and scam >= MIN_REPORTERS and scam > 2 * ok and not excepted(it["x"]):
             (nums if it["t"] == "n" else webs).append(it["x"])
     return sorted(set(nums)), sorted(set(webs))
 
@@ -171,7 +210,7 @@ def parse_coi(page: str):
         text = html.unescape(re.sub(r"<[^>]+>", "", raw)).strip().lower()
         text = re.sub(r"^https?://", "", text).removeprefix("www.").rstrip("/")
         host = text.split("/")[0]
-        if HOST_RE.match(host) and not protected_host(host) and host not in SHARED:
+        if HOST_RE.match(host) and not protected_host(host) and host not in SHARED and not excepted(host):
             out.add(host)
     return sorted(out)
 
@@ -183,7 +222,7 @@ def parse_phish(data: str):
         if not h or h.startswith("#"):
             continue
         h = h.removeprefix("www.")
-        if HOST_RE.match(h) and not protected_host(h) and h not in SHARED:
+        if HOST_RE.match(h) and not protected_host(h) and h not in SHARED and not excepted(h):
             hosts.add(h)
     return hosts
 
@@ -282,7 +321,7 @@ def main():
         f.write("".join(n + "\n" for n in nums))
     with open(os.path.join(folder, "weby.txt"), "w", encoding="utf-8") as f:
         f.write("".join(f"komunita {w}\n" for w in community))
-        f.write("".join(f"coi {w}\n" for w in coi if w not in set(community)))
+        f.write("".join(f"coi {w}\n" for w in coi if w not in set(community) and not excepted(w)))
     with open(os.path.join(folder, "cisla.txt"), "rb") as a, open(os.path.join(folder, "weby.txt"), "rb") as b:
         version = hashlib.sha256(a.read() + b"|" + b.read()).hexdigest()[:12]
     info = {

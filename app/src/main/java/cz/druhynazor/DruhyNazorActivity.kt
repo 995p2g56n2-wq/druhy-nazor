@@ -126,6 +126,21 @@ class DruhyNazorActivity : Activity() {
         }
         root.addView(call)
 
+        // ---- Společný seznam podvodníků ----
+        val share = Ui.card(this)
+        share.addView(Ui.text(this, "Společný seznam podvodníků", 22f, bold = true))
+        share.addView(Ui.text(this,
+            "Když rodina označí zprávu jako podvod, pošleme číslo podvodníka a adresu podvodného webu do společného seznamu, " +
+                "aby varoval i ostatní. Neposílá se jméno, číslo seniora ani text zprávy.", 17f, color = Ui.MUTED))
+        share.addView(android.widget.CheckBox(this).apply {
+            text = "Hlásit podvodníky do společného seznamu"
+            textSize = 18f
+            setTextColor(Ui.INK)
+            isChecked = prefs.shareReports
+            setOnCheckedChangeListener { _, on -> prefs.shareReports = on }
+        })
+        root.addView(share)
+
         // ---- Zkušební nastavení (jen pro zkoušení, schované) ----
         if (!testShown) {
             root.addView(Ui.button(this, "Nastavení pro zkoušení", Ui.BG, Ui.MUTED, sp = 16f) { testShown = true; render() })
