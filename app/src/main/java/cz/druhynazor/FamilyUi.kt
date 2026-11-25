@@ -93,9 +93,12 @@ object FamilyUi {
         manual(a, card, onChanged)
 
         if (list.isNotEmpty()) {
-            card.addView(Ui.button(a, "Poslat rodině zkušební SMS", Ui.CARD, Ui.ACCENT, sp = 17f) {
-                Family.sms(a, "Postaráno: Zkouška. Takhle vám přijde zpráva, když ${prefs.seniorName} dostane něco podezřelého. Teď nemusíte odpovídat.")
-                Toast.makeText(a, "Odesláno", Toast.LENGTH_LONG).show()
+            card.addView(Ui.text(a,
+                "Zkouška: ťukněte na tlačítko a ať někdo z rodiny odpoví na SMS slovem ANO. Do minuty tady vyskočí ✅ Zkouška vyšla.",
+                16f, color = Ui.MUTED))
+            card.addView(Ui.button(a, "Vyzkoušet s rodinou", Ui.CARD, Ui.ACCENT, sp = 17f) {
+                Verdicts.sendTest(a)
+                Toast.makeText(a, "Odesláno. Teď ať někdo z rodiny odpoví ANO.", Toast.LENGTH_LONG).show()
             })
         }
         return card

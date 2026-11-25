@@ -65,7 +65,6 @@ class GuardService : Service() {
             return
         }
         listen()
-        Verdicts.startListening(this)
         SharedList.startUpdates(this)
     }
 
@@ -157,7 +156,6 @@ class GuardService : Service() {
                 tm.listen(cb, PhoneStateListener.LISTEN_NONE)
             }
         }
-        Verdicts.stopListening()
         SharedList.stopUpdates()
         super.onDestroy()
     }

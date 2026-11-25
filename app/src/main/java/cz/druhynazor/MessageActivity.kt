@@ -20,6 +20,7 @@ class MessageActivity : Activity() {
     private var body = ""
     private var incoming = false
     private var key = ""
+    private var resumedOnce = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,8 +37,9 @@ class MessageActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        // Mezitím mohla rodina zprávu zkontrolovat
-        if (incoming && body.isNotEmpty()) Verdicts.pollNow(this) { changed -> if (changed && !isFinishing) build() }
+        // Mezitím mohla rodina zprávu zkontrolovat (odpověď ANO / NE přišla SMS)
+        if (resumedOnce && incoming && body.isNotEmpty()) build()
+        resumedOnce = true
     }
 
     private fun build() {

@@ -432,7 +432,6 @@ class LetterActivity : Activity() {
         val prefs = Prefs(this)
         if (prefs.familyContacts.isEmpty() || checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) return
         Family.sms(this, s.familyText)
-        if (prefs.ntfyEnabled) Family.ntfy(this, "Dopis: " + ScamCheck.headline(s.level), s.familyText, s.level == ScamCheck.Level.SCAM)
         s.photo?.let { Mms.sendPhoto(this, Uri.fromFile(File(it)), s.familyText) }
         sentToFamily = true
         spoken = null

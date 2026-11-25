@@ -2,7 +2,6 @@ package cz.druhynazor
 
 import android.content.Context
 import android.content.SharedPreferences
-import kotlin.random.Random
 
 data class FamilyContact(val name: String, val phone: String)
 
@@ -52,11 +51,6 @@ class Prefs(context: Context) {
         return familyContacts.firstOrNull { normalize(it.phone) == n }
     }
 
-    /** Posílat upozornění i do aplikace ntfy (zkušební cesta). */
-    var ntfyEnabled: Boolean
-        get() = p.getBoolean("ntfy_enabled", true)
-        set(v) = p.edit().putBoolean("ntfy_enabled", v).apply()
-
     /** Telefon umí mluvit česky (hlasem Google). */
     var voiceOk: Boolean
         get() = d.getBoolean("voice_ok", false)
@@ -96,17 +90,6 @@ class Prefs(context: Context) {
     var setupAlertTime: Long
         get() = d.getLong("setup_alert_time", 0L)
         set(v) = d.edit().putLong("setup_alert_time", v).apply()
-
-    /** Kanál v aplikaci ntfy, přes který chodí upozornění rodině. */
-    var familyChannel: String
-        get() {
-            val existing = p.getString("family_channel", null)
-            if (!existing.isNullOrBlank()) return existing
-            val fresh = "druhy-nazor-" + (1..10).map { "abcdefghijkmnpqrstuvwxyz23456789"[Random.nextInt(32)] }.joinToString("")
-            p.edit().putString("family_channel", fresh).apply()
-            return fresh
-        }
-        set(v) = p.edit().putString("family_channel", v).apply()
 
     /** Čísla, která se v testu chovají jako nahlášení podvodníci (oddělená čárkou). */
     var testScamNumbers: String

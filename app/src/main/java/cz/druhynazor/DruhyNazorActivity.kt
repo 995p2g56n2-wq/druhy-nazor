@@ -1,8 +1,6 @@
 package cz.druhynazor
 
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Bundle
 import android.text.format.DateFormat
@@ -37,7 +35,6 @@ class DruhyNazorActivity : Activity() {
         super.onResume()
         if (DnSetupActivity.permsGranted(this)) GuardService.start(this)
         render()
-        Verdicts.pollNow(this) { changed -> if (changed && !isFinishing) render() }
     }
 
     private fun render() {
@@ -165,26 +162,6 @@ class DruhyNazorActivity : Activity() {
             Toast.makeText(this, "Uloženo", Toast.LENGTH_SHORT).show()
         })
 
-        cfg.addView(Ui.text(this, "Zkušební upozornění přes ntfy", 18f, bold = true))
-        val ntfy = android.widget.CheckBox(this).apply {
-            text = "Posílat upozornění i do aplikace ntfy (s tlačítky)"
-            textSize = 17f
-            setTextColor(Ui.INK)
-            isChecked = prefs.ntfyEnabled
-            setOnCheckedChangeListener { _, on -> prefs.ntfyEnabled = on }
-        }
-        cfg.addView(ntfy)
-        cfg.addView(Ui.text(this,
-            "V aplikaci „ntfy“ se přihlaste k odběru tohoto kanálu:", 16f, color = Ui.MUTED))
-        cfg.addView(Ui.text(this, prefs.familyChannel, 20f, bold = true, color = Ui.ACCENT).apply { setTextIsSelectable(true) })
-        cfg.addView(Ui.button(this, "Zkopírovat kanál", Ui.CARD, Ui.ACCENT, sp = 17f) {
-            getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("kanal", prefs.familyChannel))
-            Toast.makeText(this, "Zkopírováno", Toast.LENGTH_SHORT).show()
-        })
-        cfg.addView(Ui.button(this, "Poslat zkušební upozornění do ntfy", Ui.CARD, Ui.ACCENT, sp = 17f) {
-            Family.ntfy(this, "Postaráno: zkouška", "Upozornění funguje. Takhle vám přijde zpráva, když bude seniorovi hrozit podvod.", urgent = false)
-            Toast.makeText(this, "Odesláno, podívejte se do ntfy", Toast.LENGTH_LONG).show()
-        })
         cfg.addView(Ui.button(this, "Ukázat varování před podvodníkem", Ui.CARD, Ui.ACCENT, sp = 17f) {
             startActivity(Intent(this, ScamCallActivity::class.java).putExtra(ScamCallActivity.EXTRA_NUMBER, "777 000 000 (zkouška)"))
         })

@@ -3,28 +3,28 @@ package cz.druhynazor
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.util.Log
-import org.json.JSONArray
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
-import kotlin.concurrent.thread
-import kotlin.random.Random
 
 /**
- * Rodina potvrzuje podezřelé zprávy. Upozornění v ntfy má tlačítka „Je to v pořádku“ a „Je to podvod“.
- * Tlačítko pošle odpověď do kanálu „…-odpoved“, telefon seniora ji přečte a zprávu označí.
- * Každá zpráva má vlastní náhodný klíč, takže cizí odpověď bez něj nic nezmění.
+ * Rodina potvrzuje podezřelé zprávy odpovědí na SMS: „ANO 2“ = v pořádku, „NE 2“ = podvod.
+ * Počítá se jen odpověď z čísla, které je v seznamu rodiny.
  */
 object Verdicts {
     enum class Verdict { OK, SCAM }
 
-    private const val NTFY = "https://ntfy.sh/"
+    /** Klíč zkušební otázky „Vyzkoušet s rodinou“. Nehlásí nic do společného seznamu. */
+    const val TEST_KEY = "zkouska"
+
+    /** Zkouška s rodinou: SMS s otázkou ANO / NE. Rodina odpoví a senior uvidí, že to funguje. */
+    fun sendTest(ctx: Context) {
+        val p = prefs(ctx)
+        p.edit().remove("v_$TEST_KEY").remove("by_$TEST_KEY").apply()
+        val senior = Prefs(ctx).seniorName
+        Family.notify(ctx, "Zkouška",
+            "Toto je jen zkouška, nic se neděje. Takhle vám přijde zpráva, když $senior dostane něco podezřelého. " +
+            "Odpovězte prosím, ať víme, že vaše odpověď dojde.", urgent = false, reviewKey = TEST_KEY)
+    }
 
     private fun prefs(ctx: Context) = ctx.applicationContext.getSharedPreferences("verdikty", Context.MODE_PRIVATE)
-
-    fun replyChannel(ctx: Context) = Prefs(ctx).familyChannel + "-odpoved"
 
     fun keyForSms(id: Long) = "s$id"
     fun keyForText(from: String, text: String) = "c" + (from + text).hashCode().toUInt().toString(16)
@@ -33,28 +33,6 @@ object Verdicts {
         "ok" -> Verdict.OK
         "scam" -> Verdict.SCAM
         else -> null
-    }
-
-    /** Tlačítka do upozornění pro rodinu. */
-    fun actions(ctx: Context, key: String): JSONArray {
-        val p = prefs(ctx)
-        val token = p.getString("t_$key", null) ?: (1..10).map { "abcdefghijkmnpqrstuvwxyz23456789"[Random.nextInt(32)] }
-            .joinToString("").also { p.edit().putString("t_$key", it).apply() }
-        val url = NTFY + replyChannel(ctx)
-        fun btn(label: String, verdict: String) = JSONObject()
-            .put("action", "http").put("label", label).put("url", url)
-            .put("method", "POST").put("body", "$verdict|$key|$token").put("clear", true)
-        return JSONArray().put(btn("✅ Je to v pořádku", "ok")).put(btn("⛔ Je to podvod", "scam"))
-    }
-
-    /** Zpracuje jednu odpověď z kanálu ntfy. Vrací true, pokud se něco změnilo. */
-    private fun apply(ctx: Context, message: String): Boolean {
-        val parts = message.trim().split('|')
-        if (parts.size != 3) return false
-        val (verdict, key, token) = parts
-        if (verdict != "ok" && verdict != "scam") return false
-        if (prefs(ctx).getString("t_$key", null) != token) return false
-        return record(ctx, key, if (verdict == "ok") Verdict.OK else Verdict.SCAM, null, null)
     }
 
     /** Kdo zprávu posoudil (jméno z rodiny), nebo null. */
@@ -72,6 +50,7 @@ object Verdicts {
 
         val prefsMain = Prefs(ctx)
         val ok = verdict == Verdict.OK
+        if (key == TEST_KEY) { testDone(ctx, ok, byName ?: prefsMain.familyName, byNumber); return true }
         // Rodina schválila SMS od odesílatele se jménem: příště už jeho reklamu nehlásit
         if (ok && key.startsWith("s")) key.drop(1).toLongOrNull()?.let { SmsStore.byId(ctx, it) }
             ?.let { TrustedSenders.learn(ctx, it.address, it.body) }
@@ -93,10 +72,20 @@ object Verdicts {
         if (byNumber != null) {
             Family.sendSms(ctx, byNumber, "Postaráno: Díky. $result")
             Family.sms(ctx, "Postaráno: Vyřízeno. $who napsal(a): ${if (ok) "zpráva je v pořádku" else "je to podvod"}. Nemusíte nic dělat.", except = byNumber)
-        } else if (prefsMain.ntfyEnabled) {
-            Family.ntfy(ctx, "Hotovo", result, urgent = false)
         }
         return true
+    }
+
+    /** Odpověď na zkoušku: senior uvidí, kdo odpověděl, rodina dostane potvrzení. Nic se nikam nehlásí. */
+    private fun testDone(ctx: Context, ok: Boolean, who: String, byNumber: String?) {
+        val prefsMain = Prefs(ctx)
+        val answer = if (ok) "ANO" else "NE"
+        val tap = Intent(ctx, DruhyNazorActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        Notify.show(ctx, 7999, Notify.CH_MSG, "✅ Zkouška vyšla",
+            "$who odpověděl(a) $answer. Odpovědi rodiny fungují.", tap, Ui.OK)
+        val text = "Zkouška vyšla. Vaše odpověď $answer dorazila na telefon ${prefsMain.seniorGenitive}. " +
+            "Stejně budete odpovídat, až přijde opravdu podezřelá zpráva."
+        if (byNumber != null) Family.sendSms(ctx, byNumber, "Postaráno: $text")
     }
 
     // ---------- Odpovědi rodiny přes SMS ----------
@@ -133,72 +122,4 @@ object Verdicts {
         }
         return true
     }
-
-    private fun handleLine(ctx: Context, line: String): Boolean = try {
-        val o = JSONObject(line)
-        if (o.optString("event") != "message") false else {
-            prefs(ctx).edit().putString("since_id", o.optString("id")).apply()
-            apply(ctx, o.optString("message"))
-        }
-    } catch (e: Exception) { false }
-
-    private fun sinceParam(ctx: Context): String {
-        // ntfy umí pokračovat od posledního přečteného ID zprávy; napoprvé posledních 12 hodin
-        val id = prefs(ctx).getString("since_id", null)
-        return if (!id.isNullOrBlank()) URLEncoder.encode(id, "UTF-8") else "12h"
-    }
-
-    private fun open(ctx: Context, poll: Boolean): HttpURLConnection {
-        val topic = URLEncoder.encode(replyChannel(ctx), "UTF-8")
-        val url = NTFY + topic + "/json?since=" + sinceParam(ctx) + if (poll) "&poll=1" else ""
-        return (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15_000
-            readTimeout = if (poll) 15_000 else 120_000 // ntfy posílá keepalive zhruba každých 45 s
-        }
-    }
-
-    /** Jednorázově stáhne nové odpovědi (při otevření zprávy). Hotovo = zavolá onDone na hlavním vlákně. */
-    fun pollNow(ctx: Context, onDone: (changed: Boolean) -> Unit) {
-        val app = ctx.applicationContext
-        val main = android.os.Handler(android.os.Looper.getMainLooper())
-        thread(name = "verdikty-poll") {
-            var changed = false
-            try {
-                val c = open(app, poll = true)
-                c.inputStream.bufferedReader().useLines { lines -> lines.forEach { if (handleLine(app, it)) changed = true } }
-                c.disconnect()
-            } catch (e: Exception) {
-                Log.w("DruhyNazor", "Odpovědi rodiny se nepodařilo načíst", e)
-            }
-            main.post { onDone(changed) }
-        }
-    }
-
-    @Volatile private var listening = false
-
-    /** Trvale poslouchá odpovědi rodiny. Běží, dokud běží hlídání. */
-    fun startListening(ctx: Context) {
-        if (listening) return
-        listening = true
-        val app = ctx.applicationContext
-        thread(name = "verdikty", isDaemon = true) {
-            var wait = 5_000L
-            while (listening) {
-                try {
-                    val c = open(app, poll = false)
-                    c.inputStream.bufferedReader().useLines { lines ->
-                        for (l in lines) { if (!listening) break; handleLine(app, l); wait = 5_000L }
-                    }
-                    c.disconnect()
-                } catch (e: Exception) {
-                    Log.i("DruhyNazor", "Spojení pro odpovědi rodiny přerušeno, zkusím znovu")
-                }
-                if (!listening) break
-                try { Thread.sleep(wait) } catch (_: InterruptedException) { }
-                wait = (wait * 2).coerceAtMost(300_000L)
-            }
-        }
-    }
-
-    fun stopListening() { listening = false }
 }
