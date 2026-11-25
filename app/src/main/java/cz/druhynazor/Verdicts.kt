@@ -22,6 +22,19 @@ object Verdicts {
 
     private const val NTFY = "https://ntfy.sh/"
 
+    /** Klíč zkušební otázky „Vyzkoušet s rodinou“. Nehlásí nic do společného seznamu. */
+    const val TEST_KEY = "zkouska"
+
+    /** Zkouška s rodinou: SMS s ANO / NE a v ntfy tlačítka. Rodina odpoví a senior uvidí, že to funguje. */
+    fun sendTest(ctx: Context) {
+        val p = prefs(ctx)
+        p.edit().remove("v_$TEST_KEY").remove("by_$TEST_KEY").apply()
+        val senior = Prefs(ctx).seniorName
+        Family.notify(ctx, "Zkouška",
+            "Toto je jen zkouška, nic se neděje. Takhle vám přijde zpráva, když $senior dostane něco podezřelého. " +
+            "Odpovězte prosím, ať víme, že vaše odpověď dojde.", urgent = false, reviewKey = TEST_KEY)
+    }
+
     private fun prefs(ctx: Context) = ctx.applicationContext.getSharedPreferences("verdikty", Context.MODE_PRIVATE)
 
     fun replyChannel(ctx: Context) = Prefs(ctx).familyChannel + "-odpoved"
@@ -72,6 +85,7 @@ object Verdicts {
 
         val prefsMain = Prefs(ctx)
         val ok = verdict == Verdict.OK
+        if (key == TEST_KEY) { testDone(ctx, ok, byName ?: prefsMain.familyName, byNumber); return true }
         // Rodina schválila SMS od odesílatele se jménem: příště už jeho reklamu nehlásit
         if (ok && key.startsWith("s")) key.drop(1).toLongOrNull()?.let { SmsStore.byId(ctx, it) }
             ?.let { TrustedSenders.learn(ctx, it.address, it.body) }
@@ -97,6 +111,19 @@ object Verdicts {
             Family.ntfy(ctx, "Hotovo", result, urgent = false)
         }
         return true
+    }
+
+    /** Odpověď na zkoušku: senior uvidí, kdo odpověděl, rodina dostane potvrzení. Nic se nikam nehlásí. */
+    private fun testDone(ctx: Context, ok: Boolean, who: String, byNumber: String?) {
+        val prefsMain = Prefs(ctx)
+        val answer = if (ok) "ANO" else "NE"
+        val tap = Intent(ctx, DruhyNazorActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        Notify.show(ctx, 7999, Notify.CH_MSG, "✅ Zkouška vyšla",
+            "$who odpověděl(a) $answer. Odpovědi rodiny fungují.", tap, Ui.OK)
+        val text = "Zkouška vyšla. Vaše odpověď $answer dorazila na telefon ${prefsMain.seniorGenitive}. " +
+            "Stejně budete odpovídat, až přijde opravdu podezřelá zpráva."
+        if (byNumber != null) Family.sendSms(ctx, byNumber, "Postaráno: $text")
+        else if (prefsMain.ntfyEnabled) Family.ntfy(ctx, "Zkouška vyšla", "$who odpověděl(a) $answer. $text", urgent = false)
     }
 
     // ---------- Odpovědi rodiny přes SMS ----------

@@ -55,6 +55,20 @@ object Family {
         }
     }
 
+    /** Odkaz, který v aplikaci ntfy rovnou přihlásí odběr kanálu rodiny. */
+    fun ntfyLink(context: Context) = "ntfy://ntfy.sh/" + Prefs(context).familyChannel + "?display=Postar%C3%A1no"
+
+    /** SMS pro rodinu: jak si nainstalovat ntfy a přihlásit kanál. */
+    fun ntfyInviteText(context: Context): String {
+        val prefs = Prefs(context)
+        return "Postaráno: Chcete upozornění o telefonu ${prefs.seniorGenitive} i s tlačítky? Nepovinné, SMS vám chodit budou dál.\n" +
+            "1. V Obchodě Play (na iPhonu v App Store) najděte aplikaci ntfy a nainstalujte ji.\n" +
+            "2. Otevřete ntfy, ťukněte na + a jako název (topic) napište přesně:\n" +
+            "${prefs.familyChannel}\n" +
+            "3. Ťukněte na Subscribe (Přihlásit). Upozornění povolte.\n" +
+            "Na Androidu místo kroků 2 a 3 stačí ťuknout na odkaz, pokud jde ťuknout: ${ntfyLink(context)}"
+    }
+
     fun ntfy(context: Context, title: String, message: String, urgent: Boolean, actions: JSONArray? = null) {
         val channel = Prefs(context).familyChannel
         thread(name = "family-notify") {
