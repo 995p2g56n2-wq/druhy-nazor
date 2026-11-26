@@ -62,6 +62,7 @@
         <activity android:name=".DruhyNazorActivity" android:exported="false" android:launchMode="singleTop" />
         <activity android:name=".DnSetupActivity" android:exported="false" />
         <activity android:name=".MessageActivity" android:exported="false" />
+        <activity android:name=".PolicyActivity" android:exported="false" />
         <activity
             android:name=".LetterActivity"
             android:exported="true"

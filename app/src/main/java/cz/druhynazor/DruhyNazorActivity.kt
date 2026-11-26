@@ -139,6 +139,9 @@ class DruhyNazorActivity : Activity() {
             isChecked = prefs.shareReports
             setOnCheckedChangeListener { _, on -> prefs.shareReports = on }
         })
+        share.addView(Ui.button(this, "📄 Podrobné vysvětlení a Zásady", Ui.CARD, Ui.ACCENT, sp = 17f) {
+            startActivity(Intent(this, PolicyActivity::class.java))
+        })
         root.addView(share)
 
         // ---- Zkušební nastavení (jen pro zkoušení, schované) ----
