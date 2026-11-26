@@ -28,6 +28,8 @@ object Ui {
     val OK = Color.rgb(0x1D, 0x7A, 0x3A)
     val WARN = Color.rgb(0xA8, 0x5D, 0x00)
     val BAD = Color.rgb(0xB3, 0x26, 0x1E)
+    /** Jen pro tlačítko WhatsApp, aby se nepletlo s ostatními zelenými. */
+    val BLUE = Color.rgb(0x1E, 0x5A, 0xC8)
 
     fun color(level: ScamCheck.Level) = when (level) {
         ScamCheck.Level.SCAM -> BAD

@@ -3,7 +3,7 @@ package cz.druhynazor
 import java.time.LocalDate
 
 /**
- * Přečte text dopisu (z fotky) a řekne tři věci: o co jde, jestli je to pravé, co udělat a do kdy.
+ * Přečte text dopisu (z fotky) a řekne tři věci: o co jde, jestli to není podvod, co udělat a do kdy.
  * Všechno běží přímo v telefonu, text dopisu se nikam neposílá.
  *
  * Kontroly pravosti (propojené s Druhým názorem):
@@ -38,12 +38,34 @@ object LetterReader {
         val textLength: Int,
     ) {
         val wantsMoney get() = kind in setOf(Kind.PAY, Kind.DEBT, Kind.EXEKUCE) || (kind == Kind.COURT && amount != null)
+        /** Velká částka (od 10 000 Kč): i když je dopis v pořádku, ať ho radši vidí rodina. */
+        val big get() = wantsMoney && (amount ?: 0L) >= 1_000_000L
     }
 
     // ---------- Známí odesílatelé ----------
 
     /** Jméno do věty, vzory v textu, oficiální stránky, co obvykle chtějí zaplatit. */
-    private class Known(val name: String, val patterns: List<String>, val sites: Set<String>, val what: String? = null)
+    private class Known(val name: String, val patterns: List<String>, val sites: Set<String>, val what: String? = null) {
+        /**
+         * Vzor musí začínat na začátku slova. Krátké zkratky (OZP, ČPP…) musí být celé slovo,
+         * jinak by „ozp“ našlo i „rozpis“ na každé faktuře za elektřinu.
+         */
+        private val res = patterns.map { p ->
+            Regex("(?<![\\p{L}\\d])" + Regex.escape(p.trim()) + (if (p.trim().length <= 5) "(?![\\p{L}\\d])" else ""))
+        }
+        fun matches(lower: String) = res.any { it.containsMatchIn(lower) }
+
+        /**
+         * Odesílatel se počítá, jen když je na dopise opravdu napsaný: celým jménem, nebo zkratkou
+         * a k tomu jeho vlastní stránkou. Samotná krátká zkratka nestačí (může to být kus jiného slova
+         * nebo špatně přečtené písmeno).
+         */
+        fun confirmed(lower: String, sitesInText: Set<String>): Boolean {
+            val hits = patterns.indices.filter { res[it].containsMatchIn(lower) }
+            if (hits.isEmpty()) return false
+            return hits.any { patterns[it].trim().length > 5 } || sitesInText.any { it in sites }
+        }
+    }
 
     private val known = listOf(
         Known("Česká televize", listOf("česká televize", "ceska televize", "televizní poplat", "ceskatelevize"), setOf("ceskatelevize.cz"), "televizní poplatek"),
@@ -55,7 +77,11 @@ object LetterReader {
         Known("úřad práce", listOf("úřad práce", "urad prace"), setOf("uradprace.cz", "mpsv.cz")),
         Known("ČEZ", listOf("čez prodej", "cez prodej", "čez distribuce", "čez, a.s", "skupina čez"), setOf("cez.cz"), "elektřinu"),
         Known("E.ON", listOf("e.on energie", "e.on distribuce", "eon.cz", "e.on česká"), setOf("eon.cz"), "elektřinu"),
-        Known("innogy", listOf("innogy"), setOf("innogy.cz"), "plyn"),
+        Known("innogy", listOf("innogy"), setOf("innogy.cz"), "energie"),
+        Known("Dobrá energie", listOf("dobrá energie", "dobra energie", "dobraenergie"), setOf("dobraenergie.cz"), "energie"),
+        Known("Armex Energy", listOf("armex energy", "armexenergy"), setOf("armexenergy.cz"), "energie"),
+        Known("Tedom Energie", listOf("tedom energie"), setOf("tedomenergie.cz"), "energie"),
+        Known("Nano Energies", listOf("nano energies", "nanoenergies"), setOf("nanoenergies.cz"), "energie"),
         Known("Pražská energetika", listOf("pražská energetika", "prazska energetika", "pre.cz"), setOf("pre.cz"), "elektřinu"),
         Known("Pražská plynárenská", listOf("pražská plynárenská", "prazska plynarenska"), setOf("ppas.cz"), "plyn"),
         Known("Centropol", listOf("centropol"), setOf("centropol.cz"), "energie"),
@@ -197,8 +223,12 @@ object LetterReader {
         val lower = text.lowercase()
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
 
-        val k = known.firstOrNull { kn -> kn.patterns.any { it in lower } }
-        val sender = k?.name ?: guessSender(lines)
+        val sites = ScamCheck.sites(text)
+        val k = known.firstOrNull { it.confirmed(lower, sites) }
+        val header = guessSender(lines)
+        // Hlavička dopisu říká někoho jiného než známé jméno uvnitř textu (třeba vymahač „za ČEZ“)
+        val headerConflict = k != null && header != null && !k.matches(header.lowercase())
+        val sender = if (headerConflict) header else k?.name ?: header
 
         val kind = when {
             exekuceRe.containsMatchIn(text) -> Kind.EXEKUCE
@@ -223,7 +253,7 @@ object LetterReader {
         }
         if (amount == null) {
             val all = moneyRe.findAll(text).mapNotNull { parseAmount(it) }.toList()
-            amount = if (all.size == 1) all[0] else all.groupingBy { it }.eachCount().filter { it.value > 1 }.maxByOrNull { it.key }?.key ?: all.maxOrNull()
+            amount = if (all.size == 1) all[0] else all.groupingBy { it }.eachCount().filter { it.value > 1 }.maxByOrNull { it.key }?.key // víc různých částek: radši žádnou, než hádat
         }
 
         // Termín: datum na řádku „splatnost / zaplaťte do…“ nebo hned pod ním
@@ -243,7 +273,6 @@ object LetterReader {
             }.distinctBy { it.text }.toList()
         val ibans = ibanRe.findAll(text).map { it.groupValues[1].replace(" ", "") }.filter { ibanValid(it) }.distinct().toList()
         val vs = vsRe.find(text)?.groupValues?.get(1)
-        val sites = ScamCheck.sites(text)
         val phones = phoneRe.findAll(text).map { it.groupValues[1] + it.groupValues[2] + it.groupValues[3] }
             .filter { it.first() in "2345679" }.toSet()
 
@@ -268,6 +297,23 @@ object LetterReader {
         if (kind == Kind.EXEKUCE) warn += "Exekuce je vážná věc. Ať se na dopis hned podívá rodina."
         if (kind == Kind.COURT) warn += "Dopis od soudu má krátké lhůty. Ať se na něj hned podívá rodina."
         if (k == null && (kind == Kind.PAY || kind == Kind.DEBT)) warn += "Chce peníze a odesílatele neznám."
+        // Odesílatel a to, za co chce peníze, k sobě nesedí (pojišťovna chce peníze za elektřinu)
+        if (k?.what != null && (kind == Kind.PAY || kind == Kind.DEBT)) {
+            val mentioned = whatRules.filter { it.first.containsMatchIn(text) }.map { group(it.second) }.toSet()
+            val strong = mentioned.filter { it in setOf("energie", "voda", "televize", "rozhlas", "daň") }
+            if (group(k.what) !in mentioned && strong.isNotEmpty())
+                warn += "Tváří se jako ${k.name}, ale chce peníze za ${whatRules.first { group(it.second) == strong.first() && it.first.containsMatchIn(text) }.second}. To k sobě nesedí."
+        }
+        if (headerConflict) warn += "Na dopise je ${header} i ${k!!.name}. Nejsem si jistá, kdo ho poslal."
+        // Jistota: u dopisu, který chce peníze, musím přečíst odesílatele, částku i termín. Jinak nehádám.
+        if ((kind == Kind.PAY || kind == Kind.DEBT) && warn.isEmpty()) {
+            val missing = listOfNotNull(
+                if (k == null) "odesílatele" else null,
+                if (amount == null) "částku" else null,
+                if (due == null) "termín" else null,
+            )
+            if (missing.isNotEmpty()) warn += "Nepřečetla jsem jistě ${missing.joinToString(", ").replace(Regex(", (?=[^,]*$)"), " ani ")}. Ať se na dopis podívá rodina."
+        }
 
         val level = when {
             scam.isNotEmpty() -> ScamCheck.Level.SCAM
@@ -283,11 +329,24 @@ object LetterReader {
         return Letter(sender, k != null, kind, what, amount, due, accounts, ibans, vs, sites, phones, level, reasons, text.trim().length)
     }
 
+    /** Skupina, za co se platí (elektřina, plyn i „energie“ patří k sobě). */
+    private fun group(what: String) = when (what) {
+        "elektřinu", "plyn", "energie" -> "energie"
+        "vodu" -> "voda"
+        "televizní poplatek" -> "televize"
+        "rozhlasový poplatek" -> "rozhlas"
+        "zdravotní pojištění", "pojištění" -> "pojištění"
+        "daň", "daň z nemovitosti" -> "daň"
+        else -> what
+    }
+
     /** Odesílatel podle hlavičky: řádek s „s.r.o.“, „a.s.“, „úřad“… nebo první řádek. */
     private fun guessSender(lines: List<String>): String? {
         val firm = Regex("(s\\.\\s?r\\.\\s?o\\.|a\\.\\s?s\\.|spol\\.|úřad|urad|z\\.\\s?s\\.|o\\.\\s?p\\.\\s?s\\.|družstvo|bank)", RegexOption.IGNORE_CASE)
-        return lines.take(15).firstOrNull { firm.containsMatchIn(it) && it.length in 4..60 }
-            ?.replace(Regex(",?\\s*(IČO?|DIČ).*$", RegexOption.IGNORE_CASE), "")?.trim()?.trimEnd(',')
+        val notName = Regex("spojení|spojeni|účet|účt|ucet|číslo|cislo|symbol|splatn|\\d{4,}", RegexOption.IGNORE_CASE)
+        val ico = Regex(",?\\s*(IČO?|DIČ).*$", RegexOption.IGNORE_CASE)
+        return lines.take(15).map { it.replace(ico, "").trim().trimEnd(',') }
+            .firstOrNull { firm.containsMatchIn(it) && it.length in 4..60 && !notName.containsMatchIn(it) }
     }
 
     // ---------- Věty pro seniora ----------
@@ -324,8 +383,8 @@ object LetterReader {
     /** 2. věta: je to pravé? */
     fun verdict(l: Letter): String = when (l.level) {
         ScamCheck.Level.SCAM -> "Pozor, vypadá to jako podvod."
-        ScamCheck.Level.WARN -> "Nejsem si jistá, jestli je to pravé."
-        ScamCheck.Level.OK -> "Vypadá to pravé."
+        ScamCheck.Level.WARN -> "Nejsem si jistá, jestli to není podvod."
+        ScamCheck.Level.OK -> "Nevypadá to jako podvod."
     }
 
     /** 3. věta: co udělat a do kdy. */
@@ -333,10 +392,11 @@ object LetterReader {
         l.level == ScamCheck.Level.SCAM -> "Nic neplaťte a nikam nevolejte."
         l.kind == Kind.EXEKUCE || l.kind == Kind.COURT -> "Nic neplaťte a ještě dnes ho ukažte rodině."
         l.level == ScamCheck.Level.WARN && l.wantsMoney -> "Zatím nic neplaťte, ať se podívá rodina."
+        l.big && l.due != null -> "Vypadá to v pořádku, ale je to velká částka. Než zaplatíte do ${date(l.due)}, pošlete to ještě rodině."
         l.wantsMoney && l.due != null && l.due.isBefore(today) -> "Zaplaťte co nejdřív, termín byl už ${date(l.due)}."
         l.wantsMoney && l.due != null && l.due == today -> "Zaplaťte ještě dnes."
         l.wantsMoney && l.due != null -> "Zaplaťte do ${date(l.due)}."
-        l.wantsMoney -> "Zaplaťte. Termín jsem nenašla, zeptejte se rodiny."
+        l.wantsMoney -> "Zatím neplaťte. Termín jsem nenašla, ať se podívá rodina."
         l.kind == Kind.REFUND -> "Nic neplaťte, peníze vám přijdou samy."
         l.kind == Kind.AD -> "Nic nedělejte, je to jen reklama."
         else -> "Nic nedělejte, je to jen informace."

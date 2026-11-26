@@ -33,7 +33,7 @@ import kotlin.concurrent.thread
 /**
  * Modul Dopisy. Senior ťukne na dlaždici Dopis a rovnou se zapne fotoaparát, který sám pozná
  * okraje papíru (Google Document Scanner). Pak aplikace dopis přečte přímo v telefonu a nahlas řekne
- * tři věci: o co jde, jestli je to pravé, co udělat a do kdy. Pod tím Připomenout a Poslat rodině.
+ * tři věci: o co jde, jestli to není podvod, co udělat a do kdy. Pod tím Připomenout a Poslat rodině.
  *
  * Nikdy neplatí a nikdy neukazuje QR kód k platbě.
  */
@@ -142,7 +142,11 @@ class LetterActivity : Activity() {
     }
 
     override fun onPause() { super.onPause(); BackGuide.uiVisible = false; speaker.stop() }
-    override fun onResume() { super.onResume(); BackGuide.uiVisible = true }
+    override fun onResume() {
+        super.onResume(); BackGuide.uiVisible = true
+        // Návrat z WhatsAppu: říct až to, co platí teď
+        if (waOpened && screen == Screen.RESULT) { spoken = null; render() }
+    }
     override fun onDestroy() { speaker.shutdown(); super.onDestroy() }
 
     private fun say(text: String) {
@@ -331,10 +335,10 @@ class LetterActivity : Activity() {
         val next = when {
             sending -> "Posílám to rodině, chvilku počkejte."
             sendFailed -> "Zprávu rodině se nepodařilo odeslat. Teď ťukněte dole na Zkusit znovu."
-            waOpened -> "Až fotku ve WhatsAppu pošlete, vraťte se sem a ťukněte dole na Hotovo."
-            sentToFamily && waReady -> "${prefs.familyFirstName} už má zprávu. Fotku pošlete ťuknutím dole na Poslat fotku přes WhatsApp."
+            waOpened -> "Teď ťukněte dole na Hotovo."
+            sentToFamily && waReady -> "${prefs.familyFirstName} už má zprávu. Pokud chcete poslat i fotku dopisu, ťukněte dole na modré tlačítko WhatsApp. Jinak ťukněte na Hotovo."
             l.level == ScamCheck.Level.SCAM && sentToFamily -> "${prefs.familyFirstName} už o tom ví. Teď ťukněte dole na Hotovo."
-            l.level != ScamCheck.Level.OK && family && !sentToFamily -> "Teď ťukněte dole na Poslat rodině."
+            (l.level != ScamCheck.Level.OK || l.big) && family && !sentToFamily -> "Teď ťukněte dole na Poslat rodině."
             canRemind -> "Teď ťukněte dole na Připomenout."
             reminded -> "Připomenu vám to. Teď ťukněte dole na Hotovo."
             sentToFamily -> "${prefs.familyFirstName} už to má. Teď ťukněte dole na Hotovo."
@@ -361,7 +365,7 @@ class LetterActivity : Activity() {
             Family.lastProblem?.let { root.addView(Ui.text(this, "Důvod: $it", 16f, center = true, color = Ui.MUTED)) }
             root.addView(Ui.button(this, "🔁  Zkusit znovu", Ui.WARN) { sendToFamily(auto = false) })
         } else if (family && !sentToFamily && !sending) {
-            val bg = if (l.level != ScamCheck.Level.OK && !canRemind) Ui.ACCENT else Ui.CARD
+            val bg = if ((l.level != ScamCheck.Level.OK || l.big) && !canRemind) Ui.ACCENT else Ui.CARD
             root.addView(Ui.button(this, "👨‍👩‍👧  Poslat rodině", bg, if (bg == Ui.CARD) Ui.INK else android.graphics.Color.WHITE) {
                 sendToFamily(auto = false)
             })
@@ -427,17 +431,17 @@ class LetterActivity : Activity() {
         if (WhatsAppPhoto.app(this) == null) return
         val contacts = Prefs(this).familyContacts.take(3)
         for (c in contacts) {
-            val label = if (contacts.size == 1) "📷  Poslat fotku přes WhatsApp" else "📷  Fotka přes WhatsApp: ${c.name}"
-            root.addView(Ui.button(this, label, Ui.OK) {
+            val label = if (contacts.size == 1) "💬  WhatsApp: poslat fotku" else "💬  WhatsApp: fotka pro ${c.name}"
+            root.addView(Ui.button(this, label, Ui.BLUE) {
                 waOpened = true
-                speaker.say("Otevírám WhatsApp. Tam ťukněte na zelenou šipku.")
+                speaker.say("Ve WhatsAppu ťukněte na zelenou šipku.")
                 Handler(Looper.getMainLooper()).postDelayed({
                     if (isFinishing || isDestroyed) return@postDelayed
                     if (!WhatsAppPhoto.open(this, photo, text, c)) {
                         waOpened = false
                         speaker.say("WhatsApp se nepodařilo otevřít.")
                     }
-                }, 2500)
+                }, 1500)
             })
         }
         root.addView(Ui.text(this, "Otevře se WhatsApp. Tam ťukněte na zelenou šipku.", 17f, center = true, color = Ui.MUTED))
@@ -486,9 +490,9 @@ class LetterActivity : Activity() {
                 sentToFamily = true
             } else sendFailed = true
             if (isFinishing || isDestroyed) return@sms
+            // render() sám řekne, co ťuknout teď (nic dalšího, ať hlas nemluví přes sebe)
             spoken = null
             render()
-            if (!auto && ok) speaker.say("${prefs.familyFirstName} už to má. Teď ťukněte dole na Hotovo.")
         }
     }
 

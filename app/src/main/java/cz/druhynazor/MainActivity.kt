@@ -345,7 +345,7 @@ class MainActivity : Activity() {
         if (p.getBoolean("ohlaseno", false) || prefs.familyContacts.isEmpty() || !canSms()) return
         p.edit().putBoolean("ohlaseno", true).apply()
         Family.sms(this, "Postaráno: Na telefonu ${prefs.seniorGenitive} přibyl pomocník Dopisy. Na úvodní obrazovce je dlaždice Dopis: " +
-            "stačí namířit telefon na dopis a aplikace nahlas řekne, o co jde, jestli je pravý a co udělat. " +
+            "stačí namířit telefon na dopis a aplikace nahlas řekne, o co jde, jestli to není podvod a co udělat. " +
             "Tlačítkem Poslat rodině vám přijde SMS se shrnutím dopisu, fotku vám může poslat přes WhatsApp. Podezřelý dopis vám pošle sama.")
     }
 

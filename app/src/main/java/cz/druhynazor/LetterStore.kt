@@ -34,7 +34,7 @@ object LetterStore {
         val done: Boolean,
     ) {
         fun todo(today: LocalDate): String = when {
-            !wantsMoney || due == null -> "Podívejte se na dopis."
+            !wantsMoney || due == null -> "Podívejte se na dopis s rodinou."
             due.isBefore(today) -> "Zaplaťte co nejdřív, termín byl už ${LetterReader.date(due)}."
             due == today -> "Zaplaťte ještě dnes."
             else -> "Zaplaťte do ${LetterReader.date(due)}."
