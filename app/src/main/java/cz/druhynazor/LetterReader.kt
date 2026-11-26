@@ -43,7 +43,16 @@ object LetterReader {
     // ---------- Známí odesílatelé ----------
 
     /** Jméno do věty, vzory v textu, oficiální stránky, co obvykle chtějí zaplatit. */
-    private class Known(val name: String, val patterns: List<String>, val sites: Set<String>, val what: String? = null)
+    private class Known(val name: String, val patterns: List<String>, val sites: Set<String>, val what: String? = null) {
+        /**
+         * Vzor musí začínat na začátku slova. Krátké zkratky (OZP, ČPP…) musí být celé slovo,
+         * jinak by „ozp“ našlo i „rozpis“ na každé faktuře za elektřinu.
+         */
+        private val res = patterns.map { p ->
+            Regex("(?<![\\p{L}\\d])" + Regex.escape(p.trim()) + (if (p.trim().length <= 5) "(?![\\p{L}\\d])" else ""))
+        }
+        fun matches(lower: String) = res.any { it.containsMatchIn(lower) }
+    }
 
     private val known = listOf(
         Known("Česká televize", listOf("česká televize", "ceska televize", "televizní poplat", "ceskatelevize"), setOf("ceskatelevize.cz"), "televizní poplatek"),
@@ -55,7 +64,11 @@ object LetterReader {
         Known("úřad práce", listOf("úřad práce", "urad prace"), setOf("uradprace.cz", "mpsv.cz")),
         Known("ČEZ", listOf("čez prodej", "cez prodej", "čez distribuce", "čez, a.s", "skupina čez"), setOf("cez.cz"), "elektřinu"),
         Known("E.ON", listOf("e.on energie", "e.on distribuce", "eon.cz", "e.on česká"), setOf("eon.cz"), "elektřinu"),
-        Known("innogy", listOf("innogy"), setOf("innogy.cz"), "plyn"),
+        Known("innogy", listOf("innogy"), setOf("innogy.cz"), "energie"),
+        Known("Dobrá energie", listOf("dobrá energie", "dobra energie", "dobraenergie"), setOf("dobraenergie.cz"), "energie"),
+        Known("Armex Energy", listOf("armex energy", "armexenergy"), setOf("armexenergy.cz"), "energie"),
+        Known("Tedom Energie", listOf("tedom energie"), setOf("tedomenergie.cz"), "energie"),
+        Known("Nano Energies", listOf("nano energies", "nanoenergies"), setOf("nanoenergies.cz"), "energie"),
         Known("Pražská energetika", listOf("pražská energetika", "prazska energetika", "pre.cz"), setOf("pre.cz"), "elektřinu"),
         Known("Pražská plynárenská", listOf("pražská plynárenská", "prazska plynarenska"), setOf("ppas.cz"), "plyn"),
         Known("Centropol", listOf("centropol"), setOf("centropol.cz"), "energie"),
@@ -197,7 +210,7 @@ object LetterReader {
         val lower = text.lowercase()
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
 
-        val k = known.firstOrNull { kn -> kn.patterns.any { it in lower } }
+        val k = known.firstOrNull { it.matches(lower) }
         val sender = k?.name ?: guessSender(lines)
 
         val kind = when {
@@ -268,6 +281,16 @@ object LetterReader {
         if (kind == Kind.EXEKUCE) warn += "Exekuce je vážná věc. Ať se na dopis hned podívá rodina."
         if (kind == Kind.COURT) warn += "Dopis od soudu má krátké lhůty. Ať se na něj hned podívá rodina."
         if (k == null && (kind == Kind.PAY || kind == Kind.DEBT)) warn += "Chce peníze a odesílatele neznám."
+        // Odesílatel a to, za co chce peníze, k sobě nesedí (pojišťovna chce peníze za elektřinu)
+        if (k?.what != null && (kind == Kind.PAY || kind == Kind.DEBT)) {
+            val mentioned = whatRules.filter { it.first.containsMatchIn(text) }.map { group(it.second) }.toSet()
+            val strong = mentioned.filter { it in setOf("energie", "voda", "televize", "rozhlas", "daň") }
+            if (group(k.what) !in mentioned && strong.isNotEmpty())
+                warn += "Tváří se jako ${k.name}, ale chce peníze za ${whatRules.first { group(it.second) == strong.first() && it.first.containsMatchIn(text) }.second}. To k sobě nesedí."
+        }
+        // Velká částka: radši ať se podívá rodina
+        if ((kind == Kind.PAY || kind == Kind.DEBT) && (amount ?: 0L) >= 1_000_000L && warn.isEmpty())
+            warn += "Je to hodně peněz. Než zaplatíte, ať se na dopis podívá rodina."
 
         val level = when {
             scam.isNotEmpty() -> ScamCheck.Level.SCAM
@@ -281,6 +304,17 @@ object LetterReader {
             })
         }
         return Letter(sender, k != null, kind, what, amount, due, accounts, ibans, vs, sites, phones, level, reasons, text.trim().length)
+    }
+
+    /** Skupina, za co se platí (elektřina, plyn i „energie“ patří k sobě). */
+    private fun group(what: String) = when (what) {
+        "elektřinu", "plyn", "energie" -> "energie"
+        "vodu" -> "voda"
+        "televizní poplatek" -> "televize"
+        "rozhlasový poplatek" -> "rozhlas"
+        "zdravotní pojištění", "pojištění" -> "pojištění"
+        "daň", "daň z nemovitosti" -> "daň"
+        else -> what
     }
 
     /** Odesílatel podle hlavičky: řádek s „s.r.o.“, „a.s.“, „úřad“… nebo první řádek. */
@@ -336,7 +370,7 @@ object LetterReader {
         l.wantsMoney && l.due != null && l.due.isBefore(today) -> "Zaplaťte co nejdřív, termín byl už ${date(l.due)}."
         l.wantsMoney && l.due != null && l.due == today -> "Zaplaťte ještě dnes."
         l.wantsMoney && l.due != null -> "Zaplaťte do ${date(l.due)}."
-        l.wantsMoney -> "Zaplaťte. Termín jsem nenašla, zeptejte se rodiny."
+        l.wantsMoney -> "Zatím neplaťte. Termín jsem nenašla, ať se podívá rodina."
         l.kind == Kind.REFUND -> "Nic neplaťte, peníze vám přijdou samy."
         l.kind == Kind.AD -> "Nic nedělejte, je to jen reklama."
         else -> "Nic nedělejte, je to jen informace."

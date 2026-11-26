@@ -66,6 +66,38 @@ Upomínka. Dlužná částka 3 990 Kč. Uhraďte do 25.11.2026 na účet 1234567
         assertEquals(LetterReader.Kind.DEBT, l.kind)
     }
 
+    /** Stanislav 26. 11.: faktura Dobré energie se tvářila jako zdravotní pojišťovna („rozpis“ obsahuje „ozp“). */
+    @Test fun dobraEnergieNeniPojistovna() {
+        val l = show("""Dobrá energie s.r.o.
+Upomínka
+Rozpis plateb za elektřinu
+Nedoplatek k úhradě 15 697,00 Kč
+Číslo účtu 19-2000145399/0800""")
+        assertEquals("Dobrá energie", l.sender)
+        assertTrue(LetterReader.about(l).startsWith("Dobrá energie"))
+        assertTrue(l.level != ScamCheck.Level.OK) // velká částka a bez termínu
+        assertTrue(!LetterReader.todo(l, today).startsWith("Zaplaťte"))
+    }
+
+    @Test fun rozpisNeniOzp() {
+        val l = show("""Nějaká firma s.r.o.
+Rozpis záloh na elektřinu, částka 1 200 Kč, splatnost 10.12.2026""")
+        assertTrue(l.sender != "zdravotní pojišťovna")
+    }
+
+    @Test fun pojistovnaChceZaElektrinu() {
+        val l = show("""Oborová zdravotní pojišťovna
+Upomínka: nedoplatek za elektřinu 2 400 Kč. Splatnost 10.12.2026. Účet 19-2000145399/0800""")
+        assertEquals(ScamCheck.Level.WARN, l.level)
+        assertTrue(l.reasons.any { it.contains("nesedí") })
+    }
+
+    @Test fun bezTerminuNeriktZaplatte() {
+        val l = show("""ČEZ Prodej, a.s.
+Vyúčtování elektřiny, celkem k úhradě 845 Kč. Bankovní spojení 19-2000145399/0800""")
+        assertTrue(!LetterReader.todo(l, today).startsWith("Zaplaťte"))
+    }
+
     @Test fun reklama() {
         val l = show("Kaufland akční nabídka, sleva 30 % jen tento týden. Leták uvnitř.")
         assertEquals(LetterReader.Kind.AD, l.kind)
