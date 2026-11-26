@@ -150,7 +150,11 @@ class MainActivity : Activity() {
             "Teď ťukněte dole na Souhlasím."
         root.addView(Ui.text(this, say, 21f, center = true))
         speakDone(say)
-        spacer(root, 16)
+        spacer(root, 8)
+        root.addView(Ui.button(this, "📄 Podrobné vysvětlení a Zásady", Ui.CARD, Ui.ACCENT, sp = 18f) {
+            startActivity(Intent(this, PolicyActivity::class.java))
+        })
+        spacer(root, 8)
         root.addView(Ui.text(this, "👇", 44f, center = true))
         root.addView(Ui.button(this, "Souhlasím", sp = 24f) {
             Prefs(this).consentVersion = CONSENT_VERSION
@@ -354,7 +358,7 @@ class MainActivity : Activity() {
     companion object {
         private const val REQ_DN_SETUP = 20
         /** Zvýšit, když se změní, co se posílá ven. Senior pak souhlasí znovu. */
-        const val CONSENT_VERSION = 1
+        const val CONSENT_VERSION = 2
         private const val DAY = 24L * 3600 * 1000
     }
 }
