@@ -3,7 +3,7 @@ package cz.druhynazor
 import java.time.LocalDate
 
 /**
- * Přečte text dopisu (z fotky) a řekne tři věci: o co jde, jestli je to pravé, co udělat a do kdy.
+ * Přečte text dopisu (z fotky) a řekne tři věci: o co jde, jestli to není podvod, co udělat a do kdy.
  * Všechno běží přímo v telefonu, text dopisu se nikam neposílá.
  *
  * Kontroly pravosti (propojené s Druhým názorem):
@@ -324,8 +324,8 @@ object LetterReader {
     /** 2. věta: je to pravé? */
     fun verdict(l: Letter): String = when (l.level) {
         ScamCheck.Level.SCAM -> "Pozor, vypadá to jako podvod."
-        ScamCheck.Level.WARN -> "Nejsem si jistá, jestli je to pravé."
-        ScamCheck.Level.OK -> "Vypadá to pravé."
+        ScamCheck.Level.WARN -> "Nejsem si jistá, jestli to není podvod."
+        ScamCheck.Level.OK -> "Nevypadá to jako podvod."
     }
 
     /** 3. věta: co udělat a do kdy. */

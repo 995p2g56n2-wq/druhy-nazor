@@ -33,7 +33,7 @@ import kotlin.concurrent.thread
 /**
  * Modul Dopisy. Senior ťukne na dlaždici Dopis a rovnou se zapne fotoaparát, který sám pozná
  * okraje papíru (Google Document Scanner). Pak aplikace dopis přečte přímo v telefonu a nahlas řekne
- * tři věci: o co jde, jestli je to pravé, co udělat a do kdy. Pod tím Připomenout a Poslat rodině.
+ * tři věci: o co jde, jestli to není podvod, co udělat a do kdy. Pod tím Připomenout a Poslat rodině.
  *
  * Nikdy neplatí a nikdy neukazuje QR kód k platbě.
  */
