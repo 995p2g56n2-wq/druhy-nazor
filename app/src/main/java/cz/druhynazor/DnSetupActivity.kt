@@ -66,7 +66,7 @@ class DnSetupActivity : Activity() {
             button = "Ano, nastavit"),
         Step("sms", "💬", "Zprávy přes Postaráno",
             "Zprávy budu otevírat já, abych podvod zachytila dřív než vy.",
-            "V okénku pak vyberte Postaráno a stiskněte Změnit na výchozí."),
+            "V okénku je několik řádků. Ťukněte jen na řádek Postaráno a pak na Změnit na výchozí."),
         Step("perms", "✉️", "Zprávy a hovory",
             "Budu hlídat vaše zprávy a hovory, abych vás včas varovala.",
             "Ukážou se okénka pro oznámení, hovory a SMS. V každém stiskněte Povolit."),
@@ -78,7 +78,7 @@ class DnSetupActivity : Activity() {
             "V okénku pak zmáčkněte Přidat."),
         Step("calls", "📞", "Hlídání hovorů",
             "Budu hlídat hovory, abych poznala podvodníka dřív, než zvednete telefon.",
-            "V okénku pak vyberte Postaráno a vpravo dole stiskněte Změnit na výchozí."),
+            "V okénku je několik řádků. Ťukněte jen na řádek Postaráno a pak vpravo dole na Změnit na výchozí."),
         Step("overlay", "🚨", "Varování při hovoru",
             "Když volá podvodník, ukážu přes celou obrazovku červené varování.",
             "Ukáže se dlouhý seznam aplikací. V klidu v něm najděte Postaráno, klidně posuňte prstem, a zapněte přepínač vpravo."),
@@ -140,7 +140,8 @@ class DnSetupActivity : Activity() {
         // Android každou skupinu povolení ukáže ve vlastním okénku, sloučit je nejde.
         // Aspoň dopředu říct, kolik jich bude, a vypsat je na jednom místě.
         "perms" -> listOf(permsLeftText(), "V každém stiskněte Povolit.")
-        "sms", "calls" -> listOf("Vyberte Postaráno.", "Potom vpravo dole stiskněte Změnit na výchozí.")
+        // Okénko nabízí víc řádků (třeba Postaráno, Zprávy Samsung, Zprávy Google). Říct přesně, který.
+        "sms", "calls" -> listOf("V okénku je několik řádků. Ťukněte jen na řádek Postaráno.", "Potom vpravo dole stiskněte Změnit na výchozí.")
         "uklid" -> listOf("Zmáčkněte Přidat.")
         // Seznam aplikací je dlouhý a senior v něm Postaráno snadno přehlédne: polopatě, jak hledat a posunout
         "overlay" -> listOf(
@@ -232,10 +233,29 @@ class DnSetupActivity : Activity() {
             }
             return
         }
-        if (isDone(this, step.id)) { failed = false; index++ } else failed = true
+        if (isDone(this, step.id)) { failed = false; roleRetries = 0; index++; return }
+        // Výchozí Zprávy / hlídání hovorů: senior mohl v okénku ťuknout na jiný řádek.
+        // Hned to říct a okénko otevřít znovu (nejvýš dvakrát, pak obrazovka Zkusit znovu).
+        if ((step.id == "sms" || step.id == "calls") && roleRetries < 2) { roleRetries++; wrongChoice(step); return }
+        failed = true
     }
 
-    private fun next() { failed = false; index++; render() }
+    private var roleRetries = 0
+    /** Vybrali jiný řádek: velká zpráva nahoře, hlas, a po chvilce okénko znovu. */
+    private var wrongMsg: String? = null
+
+    private fun wrongChoice(step: Step) {
+        val msg = "To nebylo správně, zkusíme to znovu. Ťukněte na řádek Postaráno."
+        wrongMsg = msg
+        if (Prefs(this).voiceOk) speaker.say(msg)
+        window.decorView.postDelayed({
+            if (isFinishing || wrongMsg == null || todo.getOrNull(index)?.id != step.id) return@postDelayed
+            wrongMsg = null
+            act(step)
+        }, 5000)
+    }
+
+    private fun next() { failed = false; roleRetries = 0; wrongMsg = null; index++; render() }
 
     private fun render() {
         // Krok, který se mezitím udělal sám, přeskočit: výchozí Zprávy dostanou od telefonu
@@ -244,6 +264,14 @@ class DnSetupActivity : Activity() {
             while (index < todo.size && todo[index].id != "uklid" && isDone(this, todo[index].id)) index++
         if (index >= todo.size) { setResult(RESULT_OK); finish(); return }
         val root = Ui.column(this, 20, 18).apply { setBackgroundColor(Ui.BG) }
+        wrongMsg?.let { msg ->
+            val box = Ui.card(this, 8).apply { background = Ui.rounded(Ui.ACCENT_SOFT, 18, this@DnSetupActivity) }
+            box.addView(Ui.text(this, "⚠️", 56f, center = true))
+            box.addView(Ui.text(this, msg, 28f, bold = true, center = true))
+            root.addView(box)
+            setContentView(ScrollView(this).apply { setBackgroundColor(Ui.BG); isFillViewport = true; addView(root) })
+            return
+        }
         val hint = dialogHint
         if (awaiting && hint != null) {
             // Okénko telefonu zakrývá spodek obrazovky: pokyn jen nahoře, velkým písmem
