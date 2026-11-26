@@ -130,7 +130,11 @@ class MainActivity : Activity() {
 
     private fun afterConsent() {
         when {
-            Modules.onboarded(this) -> go(Screen.HOME)
+            // Ochrana už je celá zapnutá: rovnou domů
+            Modules.onboarded(this) && DnSetupActivity.allDone(this) -> go(Screen.HOME)
+            // Zapnutá jen napůl (třeba po přeinstalování se nastavení obnovilo ze zálohy, ale povolení chybí):
+            // pokračovat v průvodci jako dřív, ne končit na domovské obrazovce
+            Modules.onboarded(this) -> startSetup()
             // Rodina se obnovila ze zálohy (nový telefon): rovnou na povolení
             Prefs(this).familyContacts.isNotEmpty() -> startSetup()
             else -> go(Screen.FAMILY)
