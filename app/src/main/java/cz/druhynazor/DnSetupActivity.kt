@@ -236,7 +236,7 @@ class DnSetupActivity : Activity() {
         if (isDone(this, step.id)) { failed = false; roleRetries = 0; index++; return }
         // Výchozí Zprávy / hlídání hovorů: senior mohl v okénku ťuknout na jiný řádek.
         // Hned to říct a okénko otevřít znovu (nejvýš dvakrát, pak obrazovka Zkusit znovu).
-        if ((step.id == "sms" || step.id == "calls") && roleRetries < 2) { roleRetries++; wrongChoice(step); return }
+        if (step.id in setOf("sms", "calls", "overlay", "chats") && roleRetries < 2) { roleRetries++; wrongChoice(step); return }
         failed = true
     }
 
@@ -245,7 +245,9 @@ class DnSetupActivity : Activity() {
     private var wrongMsg: String? = null
 
     private fun wrongChoice(step: Step) {
-        val msg = "To nebylo správně, zkusíme to znovu. Ťukněte na řádek Postaráno."
+        val msg = if (step.id == "sms" || step.id == "calls")
+            "To nebylo správně, zkusíme to znovu. Ťukněte na řádek Postaráno."
+        else "Postaráno ještě není zapnuté. Zkusíme to znovu. Najděte řádek Postaráno a zapněte jeho přepínač."
         wrongMsg = msg
         if (Prefs(this).voiceOk) speaker.say(msg)
         window.decorView.postDelayed({
@@ -434,6 +436,9 @@ class DnSetupActivity : Activity() {
         var granted = if (id == "perms") perms().count { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED } else 0
         var doneAt = 0L
         var backSaid = 0
+        // Přístup k oznámením: co bylo zapnuté už předtím (aby šlo poznat omylem zapnutou jinou aplikaci)
+        val before = if (id == "chats") otherListeners() else emptySet()
+        var warned = emptySet<String>()
         val check = object : Runnable {
             override fun run() {
                 if (!awaiting || isFinishing || System.currentTimeMillis() > until) return
@@ -441,6 +446,15 @@ class DnSetupActivity : Activity() {
                     val now = perms().count { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
                     if (now > granted && now < perms().size) guide(listOf("Výborně. Teď zase stiskněte Povolit."))
                     granted = now
+                } else if (id == "chats" && !isDone(this@DnSetupActivity, id) && otherListeners() - before != warned) {
+                    // Zapnul jinou aplikaci (Huawei Zdraví, Domovská obrazovka…): hned upozornit, jak to vrátit
+                    val now = otherListeners() - before
+                    if (now.isNotEmpty()) guide(listOf(
+                        "Pozor, to nebylo Postaráno. Ťukněte znovu na přepínač, který jste právě zapnuli, aby zhasl.",
+                        "Pak najděte řádek Postaráno se zeleným štítem a zapněte jeho přepínač."), repeatMs = 15_000, times = 4)
+                    else guide(listOf("Výborně, je to vypnuté. Teď najděte řádek Postaráno se zeleným štítem a zapněte jeho přepínač."),
+                        repeatMs = 20_000, times = 4)
+                    warned = now
                 } else if (paused && isDone(this@DnSetupActivity, id)) {
                     val t = System.currentTimeMillis()
                     // Hotovo: hned přestat opakovat původní pokyn („najděte Postaráno…“)
@@ -482,6 +496,13 @@ class DnSetupActivity : Activity() {
                 .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         } catch (_: Exception) { }
         dot?.let { v -> watcher.postDelayed({ try { wm?.removeView(v) } catch (_: Exception) { } }, 1500) }
+    }
+
+    /** Jiné aplikace s přístupem k oznámením (balíčky), bez Postaráno. */
+    private fun otherListeners(): Set<String> {
+        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners") ?: return emptySet()
+        return flat.split(':').mapNotNull { android.content.ComponentName.unflattenFromString(it)?.packageName }
+            .filter { it != packageName }.toSet()
     }
 
     private fun requestRole(role: String) {
