@@ -40,8 +40,7 @@ object Mms {
                 val sent = PendingIntent.getBroadcast(ctx, 7000 + i,
                     Intent(ctx, MmsSentReceiver::class.java).putExtra("soubor", name),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
-                @Suppress("DEPRECATION")
-                val sm = ctx.getSystemService(SmsManager::class.java) ?: SmsManager.getDefault()
+                val sm = Family.smsManager(ctx)
                 sm.sendMultimediaMessage(ctx, uri, null, null, sent)
                 Log.i("DruhyNazor", "MMS s fotkou dopisu odeslána ke zpracování")
             } catch (e: Exception) {

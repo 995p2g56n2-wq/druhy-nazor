@@ -45,6 +45,9 @@ class LetterActivity : Activity() {
     private var saved: LetterStore.Saved? = null
     private var pages: List<Uri> = emptyList()
     private var sentToFamily = false
+    /** Odesílání rodině: null = nic, true = probíhá. */
+    private var sending = false
+    private var sendFailed = false
     private var reminded = false
     private var spoken: String? = null
 
@@ -275,7 +278,7 @@ class LetterActivity : Activity() {
         root.addView(Ui.button(this, "Zpět", Ui.BG, Ui.MUTED, sp = 17f) { finish() })
     }
 
-    private fun resetLetter() { letter = null; saved = null; pages = emptyList(); sentToFamily = false; reminded = false }
+    private fun resetLetter() { letter = null; saved = null; pages = emptyList(); sentToFamily = false; sending = false; sendFailed = false; reminded = false }
 
     private fun reading(root: LinearLayout) {
         spacer(root, 80)
@@ -326,6 +329,8 @@ class LetterActivity : Activity() {
 
         // Poslední věta: co ťuknout teď (pravidlo z testů)
         val next = when {
+            sending -> "Posílám to rodině, chvilku počkejte."
+            sendFailed -> "Zprávu rodině se nepodařilo odeslat. Teď ťukněte dole na Zkusit znovu."
             l.level == ScamCheck.Level.SCAM && sentToFamily -> "${prefs.familyFirstName} už o tom ví. Teď ťukněte dole na Hotovo."
             l.level != ScamCheck.Level.OK && family && !sentToFamily -> "Teď ťukněte dole na Poslat rodině."
             canRemind -> "Teď ťukněte dole na Připomenout."
@@ -344,11 +349,15 @@ class LetterActivity : Activity() {
         card.addView(Ui.text(this, todo, 24f, bold = true))
         root.addView(card)
         root.addView(Ui.text(this, next, 21f, center = true))
-        say("$about $verdict $todo $next")
+        // Po ťuknutí na Poslat rodině říct jen novinku, ne znovu celý dopis
+        say(if (sending || sendFailed || sentToFamily || reminded) next else "$about $verdict $todo $next")
 
         root.addView(Ui.text(this, "👇", 40f, center = true))
         if (canRemind) root.addView(Ui.button(this, "⏰  Připomenout", Ui.OK) { remindMe(l) })
-        if (family && !sentToFamily) {
+        if (family && sendFailed) {
+            root.addView(Ui.text(this, "Zkontrolujte, jestli má telefon signál a kredit.", 19f, center = true, color = Ui.WARN))
+            root.addView(Ui.button(this, "🔁  Zkusit znovu", Ui.WARN) { sendToFamily(auto = false) })
+        } else if (family && !sentToFamily && !sending) {
             val bg = if (l.level != ScamCheck.Level.OK && !canRemind) Ui.ACCENT else Ui.CARD
             root.addView(Ui.button(this, "👨‍👩‍👧  Poslat rodině", bg, if (bg == Ui.CARD) Ui.INK else android.graphics.Color.WHITE) {
                 sendToFamily(auto = false)
@@ -394,9 +403,11 @@ class LetterActivity : Activity() {
             LetterStore.done(this, s.id); LetterReminder.cancel(this, s.id); finish()
         })
         if (prefs.familyContacts.isNotEmpty()) root.addView(Ui.button(this, "👨‍👩‍👧  Poslat rodině", Ui.CARD, Ui.INK) {
-            Family.sms(this, s.familyText)
-            s.photo?.let { Mms.sendPhoto(this, Uri.fromFile(File(it)), s.familyText) }
-            speaker.say("${prefs.familyFirstName} už to má.")
+            speaker.say("Posílám to rodině.")
+            Family.sms(this, s.familyText) { ok ->
+                if (ok) s.photo?.let { Mms.sendPhoto(this, Uri.fromFile(File(it)), s.familyText) }
+                speaker.say(if (ok) "${prefs.familyFirstName} už to má." else "Zprávu rodině se nepodařilo odeslat. Zkontrolujte, jestli má telefon signál a kredit.")
+            }
         })
         root.addView(Ui.button(this, "Později", Ui.BG, Ui.MUTED, sp = 17f) { finish() })
     }
@@ -430,13 +441,25 @@ class LetterActivity : Activity() {
     private fun sendToFamily(auto: Boolean) {
         val s = saved ?: return
         val prefs = Prefs(this)
-        if (prefs.familyContacts.isEmpty() || checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) return
-        Family.sms(this, s.familyText)
-        s.photo?.let { Mms.sendPhoto(this, Uri.fromFile(File(it)), s.familyText) }
-        sentToFamily = true
-        spoken = null
+        if (prefs.familyContacts.isEmpty()) return
+        if (checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            Log.w("DruhyNazor", "Dopis rodině: chybí povolení posílat SMS")
+            sendFailed = true; spoken = null; render(); return
+        }
+        sending = true; sendFailed = false; spoken = null
         render()
-        if (!auto) speaker.say("${prefs.familyFirstName} už to má. Teď ťukněte dole na Hotovo.")
+        Family.sms(this, s.familyText) { ok ->
+            sending = false
+            if (ok) {
+                sentToFamily = true
+                // Fotka jde až po potvrzené SMS, ať se nepřetlačují
+                s.photo?.let { Mms.sendPhoto(this, Uri.fromFile(File(it)), s.familyText) }
+            } else sendFailed = true
+            if (isFinishing || isDestroyed) return@sms
+            spoken = null
+            render()
+            if (!auto && ok) speaker.say("${prefs.familyFirstName} už to má. Teď ťukněte dole na Hotovo.")
+        }
     }
 
     companion object {
