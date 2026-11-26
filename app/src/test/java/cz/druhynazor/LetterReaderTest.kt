@@ -143,6 +143,21 @@ Vyúčtování elektřiny. Zálohy 1 200 Kč, spotřeba 3 400 Kč, splatnost 10.
         assertTrue(l.level != ScamCheck.Level.OK)
     }
 
+    /** Stanislav: velká částka, ale jinak všechno sedí → v pořádku, jen ať to radši vidí rodina. */
+    @Test fun velkaCastkaVPoradku() {
+        val l = show("""Dobrá energie s.r.o.
+www.dobraenergie.cz
+Vyúčtování elektřiny
+Celkem k úhradě
+15 697,00 Kč
+Datum splatnosti
+12. 12. 2026
+Bankovní spojení: 19-2000145399/0800""")
+        assertEquals(ScamCheck.Level.OK, l.level)
+        assertTrue(l.big)
+        assertTrue(LetterReader.todo(l, today).contains("velká částka"))
+    }
+
     @Test fun reklama() {
         val l = show("Kaufland akční nabídka, sleva 30 % jen tento týden. Leták uvnitř.")
         assertEquals(LetterReader.Kind.AD, l.kind)

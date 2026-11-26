@@ -338,7 +338,7 @@ class LetterActivity : Activity() {
             waOpened -> "Teď ťukněte dole na Hotovo."
             sentToFamily && waReady -> "${prefs.familyFirstName} už má zprávu. Pokud chcete poslat i fotku dopisu, ťukněte dole na modré tlačítko WhatsApp. Jinak ťukněte na Hotovo."
             l.level == ScamCheck.Level.SCAM && sentToFamily -> "${prefs.familyFirstName} už o tom ví. Teď ťukněte dole na Hotovo."
-            l.level != ScamCheck.Level.OK && family && !sentToFamily -> "Teď ťukněte dole na Poslat rodině."
+            (l.level != ScamCheck.Level.OK || l.big) && family && !sentToFamily -> "Teď ťukněte dole na Poslat rodině."
             canRemind -> "Teď ťukněte dole na Připomenout."
             reminded -> "Připomenu vám to. Teď ťukněte dole na Hotovo."
             sentToFamily -> "${prefs.familyFirstName} už to má. Teď ťukněte dole na Hotovo."
@@ -365,7 +365,7 @@ class LetterActivity : Activity() {
             Family.lastProblem?.let { root.addView(Ui.text(this, "Důvod: $it", 16f, center = true, color = Ui.MUTED)) }
             root.addView(Ui.button(this, "🔁  Zkusit znovu", Ui.WARN) { sendToFamily(auto = false) })
         } else if (family && !sentToFamily && !sending) {
-            val bg = if (l.level != ScamCheck.Level.OK && !canRemind) Ui.ACCENT else Ui.CARD
+            val bg = if ((l.level != ScamCheck.Level.OK || l.big) && !canRemind) Ui.ACCENT else Ui.CARD
             root.addView(Ui.button(this, "👨‍👩‍👧  Poslat rodině", bg, if (bg == Ui.CARD) Ui.INK else android.graphics.Color.WHITE) {
                 sendToFamily(auto = false)
             })

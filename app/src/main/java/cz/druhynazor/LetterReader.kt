@@ -38,6 +38,8 @@ object LetterReader {
         val textLength: Int,
     ) {
         val wantsMoney get() = kind in setOf(Kind.PAY, Kind.DEBT, Kind.EXEKUCE) || (kind == Kind.COURT && amount != null)
+        /** Velká částka (od 10 000 Kč): i když je dopis v pořádku, ať ho radši vidí rodina. */
+        val big get() = wantsMoney && (amount ?: 0L) >= 1_000_000L
     }
 
     // ---------- Známí odesílatelé ----------
@@ -312,9 +314,6 @@ object LetterReader {
             )
             if (missing.isNotEmpty()) warn += "Nepřečetla jsem jistě ${missing.joinToString(", ").replace(Regex(", (?=[^,]*$)"), " ani ")}. Ať se na dopis podívá rodina."
         }
-        // Velká částka: radši ať se podívá rodina
-        if ((kind == Kind.PAY || kind == Kind.DEBT) && (amount ?: 0L) >= 1_000_000L && warn.isEmpty())
-            warn += "Je to hodně peněz. Než zaplatíte, ať se na dopis podívá rodina."
 
         val level = when {
             scam.isNotEmpty() -> ScamCheck.Level.SCAM
@@ -393,6 +392,7 @@ object LetterReader {
         l.level == ScamCheck.Level.SCAM -> "Nic neplaťte a nikam nevolejte."
         l.kind == Kind.EXEKUCE || l.kind == Kind.COURT -> "Nic neplaťte a ještě dnes ho ukažte rodině."
         l.level == ScamCheck.Level.WARN && l.wantsMoney -> "Zatím nic neplaťte, ať se podívá rodina."
+        l.big && l.due != null -> "Vypadá to v pořádku, ale je to velká částka. Než zaplatíte do ${date(l.due)}, pošlete to ještě rodině."
         l.wantsMoney && l.due != null && l.due.isBefore(today) -> "Zaplaťte co nejdřív, termín byl už ${date(l.due)}."
         l.wantsMoney && l.due != null && l.due == today -> "Zaplaťte ještě dnes."
         l.wantsMoney && l.due != null -> "Zaplaťte do ${date(l.due)}."
