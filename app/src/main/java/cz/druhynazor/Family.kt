@@ -80,7 +80,7 @@ object Family {
         SmsManager.RESULT_ERROR_NO_SERVICE -> "telefon nemá signál (kód 4)"
         SmsManager.RESULT_ERROR_NULL_PDU -> "telefon zprávu nepřijal (kód 3)"
         SmsManager.RESULT_ERROR_LIMIT_EXCEEDED -> "telefon poslal moc SMS najednou (kód 5)"
-        SmsManager.RESULT_ERROR_GENERIC_FAILURE -> "operátor zprávu odmítl, zkontrolujte kredit a číslo střediska zpráv (kód 1)"
+        SmsManager.RESULT_ERROR_GENERIC_FAILURE -> "operátor zprávu odmítl, nejspíš došel kredit na SIM kartě. Dobijte ho a zkuste to znovu (kód 1)"
         else -> "telefon zprávu odmítl (kód $code)"
     }
 
