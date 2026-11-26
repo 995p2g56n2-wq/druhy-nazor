@@ -9,6 +9,8 @@ import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.ImageView
@@ -45,6 +47,7 @@ class LetterActivity : Activity() {
     private var saved: LetterStore.Saved? = null
     private var pages: List<Uri> = emptyList()
     private var sentToFamily = false
+    private var waOpened = false
     /** Odesílání rodině: null = nic, true = probíhá. */
     private var sending = false
     private var sendFailed = false
@@ -278,7 +281,7 @@ class LetterActivity : Activity() {
         root.addView(Ui.button(this, "Zpět", Ui.BG, Ui.MUTED, sp = 17f) { finish() })
     }
 
-    private fun resetLetter() { letter = null; saved = null; pages = emptyList(); sentToFamily = false; sending = false; sendFailed = false; reminded = false }
+    private fun resetLetter() { letter = null; saved = null; pages = emptyList(); sentToFamily = false; waOpened = false; sending = false; sendFailed = false; reminded = false }
 
     private fun reading(root: LinearLayout) {
         spacer(root, 80)
@@ -301,11 +304,7 @@ class LetterActivity : Activity() {
         root.addView(Ui.button(this, "Vyfotit znovu") { pages = emptyList(); scan() })
         root.addView(Ui.button(this, "Vybrat z Fotek nebo Souborů", Ui.CARD, Ui.INK, sp = 18f) { pick() })
         if (hasPhoto && Prefs(this).familyContacts.isNotEmpty()) {
-            root.addView(Ui.button(this, "Poslat fotku rodině", Ui.CARD, Ui.INK) {
-                Mms.sendPhoto(this, pages.first(), "Postaráno: ${Prefs(this).seniorName} posílá fotku dopisu, který jsem nepřečetla.")
-                Family.sms(this, "Postaráno: ${Prefs(this).seniorName} vám posílá fotku dopisu. Přijde zvlášť jako MMS. Podívejte se na ni prosím.")
-                finish()
-            })
+            waButtons(root, pages.first(), "Posílám fotku dopisu, Postaráno ho nepřečetlo. Podívejte se na něj prosím.")
         }
         root.addView(Ui.button(this, "Zpět", Ui.BG, Ui.MUTED, sp = 16f) { finish() })
     }
@@ -326,11 +325,14 @@ class LetterActivity : Activity() {
         val canRemind = LetterReader.canRemind(l, today) && !reminded
         val family = prefs.familyContacts.isNotEmpty()
         val (strong, soft) = levelColors(l.level)
+        val waReady = family && saved?.photo != null && WhatsAppPhoto.app(this) != null
 
         // Poslední věta: co ťuknout teď (pravidlo z testů)
         val next = when {
             sending -> "Posílám to rodině, chvilku počkejte."
             sendFailed -> "Zprávu rodině se nepodařilo odeslat. Teď ťukněte dole na Zkusit znovu."
+            waOpened -> "Až fotku ve WhatsAppu pošlete, vraťte se sem a ťukněte dole na Hotovo."
+            sentToFamily && waReady -> "${prefs.familyFirstName} už má zprávu. Fotku pošlete ťuknutím dole na Poslat fotku přes WhatsApp."
             l.level == ScamCheck.Level.SCAM && sentToFamily -> "${prefs.familyFirstName} už o tom ví. Teď ťukněte dole na Hotovo."
             l.level != ScamCheck.Level.OK && family && !sentToFamily -> "Teď ťukněte dole na Poslat rodině."
             canRemind -> "Teď ťukněte dole na Připomenout."
@@ -350,7 +352,7 @@ class LetterActivity : Activity() {
         root.addView(card)
         root.addView(Ui.text(this, next, 21f, center = true))
         // Po ťuknutí na Poslat rodině říct jen novinku, ne znovu celý dopis
-        say(if (sending || sendFailed || sentToFamily || reminded) next else "$about $verdict $todo $next")
+        say(if (sending || sendFailed || sentToFamily || reminded || waOpened) next else "$about $verdict $todo $next")
 
         root.addView(Ui.text(this, "👇", 40f, center = true))
         if (canRemind) root.addView(Ui.button(this, "⏰  Připomenout", Ui.OK) { remindMe(l) })
@@ -363,6 +365,10 @@ class LetterActivity : Activity() {
             root.addView(Ui.button(this, "👨‍👩‍👧  Poslat rodině", bg, if (bg == Ui.CARD) Ui.INK else android.graphics.Color.WHITE) {
                 sendToFamily(auto = false)
             })
+        }
+        // Fotka přes WhatsApp (zdarma) až po SMS, nebo místo ní, když SMS neodešla
+        if (waReady && !sending && (sentToFamily || sendFailed)) {
+            saved?.photo?.let { waButtons(root, Uri.fromFile(File(it)), saved!!.familyText) }
         }
         root.addView(Ui.button(this, "Hotovo", if (canRemind || (family && !sentToFamily)) Ui.CARD else Ui.ACCENT,
             if (canRemind || (family && !sentToFamily)) Ui.INK else android.graphics.Color.WHITE) { finish() })
@@ -406,11 +412,35 @@ class LetterActivity : Activity() {
         if (prefs.familyContacts.isNotEmpty()) root.addView(Ui.button(this, "👨‍👩‍👧  Poslat rodině", Ui.CARD, Ui.INK) {
             speaker.say("Posílám to rodině.")
             Family.sms(this, s.familyText) { ok ->
-                if (ok) s.photo?.let { Mms.sendPhoto(this, Uri.fromFile(File(it)), s.familyText) }
                 speaker.say(if (ok) "${prefs.familyFirstName} už to má." else "Zprávu rodině se nepodařilo odeslat. Zkontrolujte, jestli má telefon signál a kredit.")
             }
         })
+        if (prefs.familyContacts.isNotEmpty()) s.photo?.let { waButtons(root, Uri.fromFile(File(it)), s.familyText) }
         root.addView(Ui.button(this, "Později", Ui.BG, Ui.MUTED, sp = 17f) { finish() })
+    }
+
+    /**
+     * Tlačítko (u více lidí z rodiny tlačítka) Poslat fotku přes WhatsApp. MMS stojí peníze,
+     * WhatsApp ne. Poslat musí senior sám ťuknutím na zelenou šipku, to jinak nejde.
+     */
+    private fun waButtons(root: LinearLayout, photo: Uri, text: String) {
+        if (WhatsAppPhoto.app(this) == null) return
+        val contacts = Prefs(this).familyContacts.take(3)
+        for (c in contacts) {
+            val label = if (contacts.size == 1) "📷  Poslat fotku přes WhatsApp" else "📷  Fotka přes WhatsApp: ${c.name}"
+            root.addView(Ui.button(this, label, Ui.OK) {
+                waOpened = true
+                speaker.say("Otevírám WhatsApp. Tam ťukněte na zelenou šipku.")
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (isFinishing || isDestroyed) return@postDelayed
+                    if (!WhatsAppPhoto.open(this, photo, text, c)) {
+                        waOpened = false
+                        speaker.say("WhatsApp se nepodařilo otevřít.")
+                    }
+                }, 2500)
+            })
+        }
+        root.addView(Ui.text(this, "Otevře se WhatsApp. Tam ťukněte na zelenou šipku.", 17f, center = true, color = Ui.MUTED))
     }
 
     private fun photoView(s: LetterStore.Saved): View? {
@@ -454,8 +484,6 @@ class LetterActivity : Activity() {
             sending = false
             if (ok) {
                 sentToFamily = true
-                // Fotka jde až po potvrzené SMS, ať se nepřetlačují
-                s.photo?.let { Mms.sendPhoto(this, Uri.fromFile(File(it)), s.familyText) }
             } else sendFailed = true
             if (isFinishing || isDestroyed) return@sms
             spoken = null
