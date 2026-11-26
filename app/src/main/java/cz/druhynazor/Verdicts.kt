@@ -15,13 +15,13 @@ object Verdicts {
     const val TEST_KEY = "zkouska"
 
     /** Zkouška s rodinou: SMS s otázkou ANO / NE. Rodina odpoví a senior uvidí, že to funguje. */
-    fun sendTest(ctx: Context) {
+    fun sendTest(ctx: Context, done: ((Boolean) -> Unit)? = null) {
         val p = prefs(ctx)
         p.edit().remove("v_$TEST_KEY").remove("by_$TEST_KEY").apply()
         val senior = Prefs(ctx).seniorName
         Family.notify(ctx, "Zkouška",
             "Toto je jen zkouška, nic se neděje. Takhle vám přijde zpráva, když $senior dostane něco podezřelého. " +
-            "Odpovězte prosím, ať víme, že vaše odpověď dojde.", urgent = false, reviewKey = TEST_KEY)
+            "Odpovězte prosím, ať víme, že vaše odpověď dojde.", urgent = false, reviewKey = TEST_KEY, done = done)
     }
 
     private fun prefs(ctx: Context) = ctx.applicationContext.getSharedPreferences("verdikty", Context.MODE_PRIVATE)

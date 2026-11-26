@@ -356,6 +356,7 @@ class LetterActivity : Activity() {
         if (canRemind) root.addView(Ui.button(this, "⏰  Připomenout", Ui.OK) { remindMe(l) })
         if (family && sendFailed) {
             root.addView(Ui.text(this, "Zkontrolujte, jestli má telefon signál a kredit.", 19f, center = true, color = Ui.WARN))
+            Family.lastProblem?.let { root.addView(Ui.text(this, "Důvod: $it", 16f, center = true, color = Ui.MUTED)) }
             root.addView(Ui.button(this, "🔁  Zkusit znovu", Ui.WARN) { sendToFamily(auto = false) })
         } else if (family && !sentToFamily && !sending) {
             val bg = if (l.level != ScamCheck.Level.OK && !canRemind) Ui.ACCENT else Ui.CARD
@@ -444,6 +445,7 @@ class LetterActivity : Activity() {
         if (prefs.familyContacts.isEmpty()) return
         if (checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             Log.w("DruhyNazor", "Dopis rodině: chybí povolení posílat SMS")
+            Family.lastProblem = "Postaráno nemá povolení posílat SMS"
             sendFailed = true; spoken = null; render(); return
         }
         sending = true; sendFailed = false; spoken = null

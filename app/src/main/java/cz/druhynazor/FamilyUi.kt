@@ -97,8 +97,12 @@ object FamilyUi {
                 "Zkouška: ťukněte na tlačítko a ať někdo z rodiny odpoví na SMS slovem ANO. Do minuty tady vyskočí ✅ Zkouška vyšla.",
                 16f, color = Ui.MUTED))
             card.addView(Ui.button(a, "Vyzkoušet s rodinou", Ui.CARD, Ui.ACCENT, sp = 17f) {
-                Verdicts.sendTest(a)
-                Toast.makeText(a, "Odesláno. Teď ať někdo z rodiny odpoví ANO.", Toast.LENGTH_LONG).show()
+                Toast.makeText(a, "Posílám zkušební SMS…", Toast.LENGTH_SHORT).show()
+                Verdicts.sendTest(a) { ok ->
+                    val msg = if (ok) "✅ SMS odešla. Teď ať někdo z rodiny odpoví ANO."
+                              else "❌ SMS neodešla: ${Family.lastProblem ?: "neznámý důvod"}"
+                    android.app.AlertDialog.Builder(a).setMessage(msg).setPositiveButton("OK", null).show()
+                }
             })
         }
         return card

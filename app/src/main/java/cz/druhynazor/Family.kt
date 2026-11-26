@@ -23,12 +23,13 @@ object Family {
     /**
      * @param reviewKey když je vyplněný, rodina má zprávu posoudit (SMS s ANO / NE).
      */
-    fun notify(context: Context, title: String, message: String, urgent: Boolean = true, reviewKey: String? = null) {
+    fun notify(context: Context, title: String, message: String, urgent: Boolean = true, reviewKey: String? = null,
+               done: ((Boolean) -> Unit)? = null) {
         val prefs = Prefs(context)
 
         val question = reviewKey?.let { Verdicts.smsQuestion(context, it) } ?: ""
         val text = "Postaráno: $title\n${message.take(400)}" + if (question.isNotEmpty()) "\n\n$question" else ""
-        sms(context, text)
+        sms(context, text, done = done)
     }
 
     /**
@@ -70,6 +71,25 @@ object Family {
     }
 
     private const val ACTION_SENT = "cz.druhynazor.SMS_ODESLANA"
+
+    /** Proč poslední SMS neodešla, lidsky (pro zkoušku v Pro rodinu). */
+    @Volatile var lastProblem: String? = null
+
+    private fun problem(code: Int) = when (code) {
+        SmsManager.RESULT_ERROR_RADIO_OFF -> "telefon je v režimu letadlo nebo má vypnutou SIM (kód 2)"
+        SmsManager.RESULT_ERROR_NO_SERVICE -> "telefon nemá signál (kód 4)"
+        SmsManager.RESULT_ERROR_NULL_PDU -> "telefon zprávu nepřijal (kód 3)"
+        SmsManager.RESULT_ERROR_LIMIT_EXCEEDED -> "telefon poslal moc SMS najednou (kód 5)"
+        SmsManager.RESULT_ERROR_GENERIC_FAILURE -> "operátor zprávu odmítl, zkontrolujte kredit a číslo střediska zpráv (kód 1)"
+        else -> "telefon zprávu odmítl (kód $code)"
+    }
+
+    /** Jen číslice a + na začátku. Kontakty ze Samsungu mají v čísle i neviditelné znaky. */
+    fun cleanNumber(phone: String): String {
+        val t = phone.trim()
+        val digits = t.filter { it in '0'..'9' }
+        return if (t.contains("+")) "+$digits" else digits
+    }
     private var counter = 0
 
     /** Jedna SMS. result (volitelně): true = telefon potvrdil odeslání všech částí. */
@@ -78,6 +98,13 @@ object Family {
         val main = Handler(Looper.getMainLooper())
         try {
             val sm = smsManager(app)
+            val number = cleanNumber(phone)
+            if (number.filter { it.isDigit() }.length < 9) {
+                lastProblem = "číslo „$phone“ není celé telefonní číslo"
+                Log.w("DruhyNazor", "SMS rodině: špatné číslo")
+                main.post { result?.invoke(false) }
+                return
+            }
             val parts = sm.divideMessage(text)
             val id = "${System.currentTimeMillis()}-${counter++}"
             var left = parts.size
@@ -89,6 +116,7 @@ object Family {
                 finished = true
                 try { app.unregisterReceiver(receiver) } catch (_: Exception) { }
                 Log.i("DruhyNazor", if (success) "SMS rodině odeslána (${parts.size} částí)" else "SMS rodině NEODEŠLA")
+                if (success) lastProblem = null else if (lastProblem == null) lastProblem = "telefon do 2 minut nepotvrdil odeslání"
                 result?.invoke(success)
             }
             receiver = object : BroadcastReceiver() {
@@ -96,6 +124,7 @@ object Family {
                     if (i.getStringExtra("id") != id) return
                     if (resultCode != Activity.RESULT_OK) {
                         ok = false
+                        lastProblem = problem(resultCode)
                         Log.w("DruhyNazor", "Část SMS neodešla, kód $resultCode")
                     }
                     if (--left <= 0) finish(ok)
@@ -110,10 +139,16 @@ object Family {
                     Intent(ACTION_SENT).setPackage(app.packageName).putExtra("id", id),
                     PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE)
             }
-            sm.sendMultipartTextMessage(phone, null, parts, sent, null)
+            lastProblem = null
+            sm.sendMultipartTextMessage(number, null, parts, sent, null)
             // Když telefon do 2 minut nic neřekne, bereme to jako neodeslané
             main.postDelayed({ finish(false) }, 120_000)
+        } catch (e: SecurityException) {
+            lastProblem = "Postaráno nemá povolení posílat SMS"
+            Log.w("DruhyNazor", "SMS rodině: chybí povolení", e)
+            main.post { result?.invoke(false) }
         } catch (e: Exception) {
+            lastProblem = "chyba v telefonu: ${e.javaClass.simpleName}"
             Log.w("DruhyNazor", "SMS rodině se nepodařilo odeslat", e)
             main.post { result?.invoke(false) }
         }
