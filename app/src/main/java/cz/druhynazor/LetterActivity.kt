@@ -336,7 +336,7 @@ class LetterActivity : Activity() {
             sending -> "Posílám to rodině, chvilku počkejte."
             sendFailed -> "Zprávu rodině se nepodařilo odeslat. Teď ťukněte dole na Zkusit znovu."
             waOpened -> "Teď ťukněte dole na Hotovo."
-            sentToFamily && waReady -> "${prefs.familyFirstName} už má zprávu. Pokud chcete poslat i fotku dopisu, ťukněte dole na zelené tlačítko WhatsApp. Jinak ťukněte na Hotovo."
+            sentToFamily && waReady -> "${prefs.familyFirstName} už má zprávu. Pokud chcete poslat i fotku dopisu, ťukněte dole na modré tlačítko WhatsApp. Jinak ťukněte na Hotovo."
             l.level == ScamCheck.Level.SCAM && sentToFamily -> "${prefs.familyFirstName} už o tom ví. Teď ťukněte dole na Hotovo."
             l.level != ScamCheck.Level.OK && family && !sentToFamily -> "Teď ťukněte dole na Poslat rodině."
             canRemind -> "Teď ťukněte dole na Připomenout."
@@ -431,8 +431,8 @@ class LetterActivity : Activity() {
         if (WhatsAppPhoto.app(this) == null) return
         val contacts = Prefs(this).familyContacts.take(3)
         for (c in contacts) {
-            val label = if (contacts.size == 1) "📷  Poslat fotku přes WhatsApp" else "📷  Fotka přes WhatsApp: ${c.name}"
-            root.addView(Ui.button(this, label, Ui.OK) {
+            val label = if (contacts.size == 1) "💬  WhatsApp: poslat fotku" else "💬  WhatsApp: fotka pro ${c.name}"
+            root.addView(Ui.button(this, label, Ui.BLUE) {
                 waOpened = true
                 speaker.say("Ve WhatsAppu ťukněte na zelenou šipku.")
                 Handler(Looper.getMainLooper()).postDelayed({
