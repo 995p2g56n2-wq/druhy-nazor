@@ -68,6 +68,7 @@ class PolicyActivity : Activity() {
                 "Právní důvod: váš výslovný souhlas (čl. 6 odst. 1 písm. a) a čl. 9 odst. 2 písm. a) GDPR).\n\n" +
                 "Souhlas můžete kdykoli odvolat v části Pro rodinu, Čtení dopisů, volba Jen v telefonu.",
 
+            "5. Společný seznam podvodníků" to
                 "Co: když rodina označí zprávu jako podvod, pošle se číslo, ze kterého přišla, adresy podvodných webů " +
                 "a náhodné označení vašeho telefonu. Vaše jméno, vaše číslo ani text zprávy se neposílají. " +
                 "Čísla lidí z vaší rodiny se nikdy nehlásí.\n" +
