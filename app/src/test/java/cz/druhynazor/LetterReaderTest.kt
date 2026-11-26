@@ -98,6 +98,51 @@ Vyúčtování elektřiny, celkem k úhradě 845 Kč. Bankovní spojení 19-2000
         assertTrue(!LetterReader.todo(l, today).startsWith("Zaplaťte"))
     }
 
+    /** Běžná faktura Dobré energie se vším, co má mít: má vyjít V pořádku a říct termín. */
+    @Test fun dobraEnergieFaktura() {
+        val l = show("""Dobrá energie s.r.o.
+Na Florenci 2116/15, 110 00 Praha 1
+www.dobraenergie.cz
+Faktura - vyúčtování elektřiny
+Rozpis plateb za období 1. 11. 2025 - 31. 10. 2026
+Celkem k úhradě
+1 850,00 Kč
+Datum splatnosti
+12. 12. 2026
+Bankovní spojení: 19-2000145399/0800
+Variabilní symbol: 2026114455""")
+        assertEquals("Dobrá energie", l.sender)
+        assertEquals(185000L, l.amount)
+        assertEquals(LocalDate.of(2026, 12, 12), l.due)
+        assertEquals(ScamCheck.Level.OK, l.level)
+        assertEquals("Zaplaťte do 12. prosince.", LetterReader.todo(l, today))
+    }
+
+    /** Vymahač, který v textu zmíní ČEZ: odesílatel je vymahač, ne ČEZ. */
+    @Test fun vymahacZaCez() {
+        val l = show("""Inkasní agentura Praha s.r.o.
+Vymáháme pohledávku za ČEZ Prodej, a.s.
+Dlužná částka 2 300 Kč, uhraďte do 10.12.2026 na účet 19-2000145399/0800""")
+        assertEquals("Inkasní agentura Praha s.r.o.", l.sender)
+        assertTrue(l.level != ScamCheck.Level.OK)
+    }
+
+    /** Víc různých částek a žádná „k úhradě“: nehádat. */
+    @Test fun nejistaCastka() {
+        val l = show("""ČEZ Prodej, a.s.
+Vyúčtování elektřiny. Zálohy 1 200 Kč, spotřeba 3 400 Kč, splatnost 10.12.2026""")
+        assertEquals(null, l.amount)
+        assertTrue(l.level != ScamCheck.Level.OK)
+        assertTrue(!LetterReader.todo(l, today).startsWith("Zaplaťte"))
+    }
+
+    /** Samotná zkratka bez stránky nestačí. */
+    @Test fun samotnaZkratkaNestaci() {
+        val l = show("""Upomínka OZP, doplaťte 900 Kč do 10.12.2026 na účet 19-2000145399/0800""")
+        assertTrue(l.sender != "zdravotní pojišťovna")
+        assertTrue(l.level != ScamCheck.Level.OK)
+    }
+
     @Test fun reklama() {
         val l = show("Kaufland akční nabídka, sleva 30 % jen tento týden. Leták uvnitř.")
         assertEquals(LetterReader.Kind.AD, l.kind)

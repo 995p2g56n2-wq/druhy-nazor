@@ -52,6 +52,17 @@ object LetterReader {
             Regex("(?<![\\p{L}\\d])" + Regex.escape(p.trim()) + (if (p.trim().length <= 5) "(?![\\p{L}\\d])" else ""))
         }
         fun matches(lower: String) = res.any { it.containsMatchIn(lower) }
+
+        /**
+         * Odesílatel se počítá, jen když je na dopise opravdu napsaný: celým jménem, nebo zkratkou
+         * a k tomu jeho vlastní stránkou. Samotná krátká zkratka nestačí (může to být kus jiného slova
+         * nebo špatně přečtené písmeno).
+         */
+        fun confirmed(lower: String, sitesInText: Set<String>): Boolean {
+            val hits = patterns.indices.filter { res[it].containsMatchIn(lower) }
+            if (hits.isEmpty()) return false
+            return hits.any { patterns[it].trim().length > 5 } || sitesInText.any { it in sites }
+        }
     }
 
     private val known = listOf(
@@ -210,8 +221,12 @@ object LetterReader {
         val lower = text.lowercase()
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
 
-        val k = known.firstOrNull { it.matches(lower) }
-        val sender = k?.name ?: guessSender(lines)
+        val sites = ScamCheck.sites(text)
+        val k = known.firstOrNull { it.confirmed(lower, sites) }
+        val header = guessSender(lines)
+        // Hlavička dopisu říká někoho jiného než známé jméno uvnitř textu (třeba vymahač „za ČEZ“)
+        val headerConflict = k != null && header != null && !k.matches(header.lowercase())
+        val sender = if (headerConflict) header else k?.name ?: header
 
         val kind = when {
             exekuceRe.containsMatchIn(text) -> Kind.EXEKUCE
@@ -236,7 +251,7 @@ object LetterReader {
         }
         if (amount == null) {
             val all = moneyRe.findAll(text).mapNotNull { parseAmount(it) }.toList()
-            amount = if (all.size == 1) all[0] else all.groupingBy { it }.eachCount().filter { it.value > 1 }.maxByOrNull { it.key }?.key ?: all.maxOrNull()
+            amount = if (all.size == 1) all[0] else all.groupingBy { it }.eachCount().filter { it.value > 1 }.maxByOrNull { it.key }?.key // víc různých částek: radši žádnou, než hádat
         }
 
         // Termín: datum na řádku „splatnost / zaplaťte do…“ nebo hned pod ním
@@ -256,7 +271,6 @@ object LetterReader {
             }.distinctBy { it.text }.toList()
         val ibans = ibanRe.findAll(text).map { it.groupValues[1].replace(" ", "") }.filter { ibanValid(it) }.distinct().toList()
         val vs = vsRe.find(text)?.groupValues?.get(1)
-        val sites = ScamCheck.sites(text)
         val phones = phoneRe.findAll(text).map { it.groupValues[1] + it.groupValues[2] + it.groupValues[3] }
             .filter { it.first() in "2345679" }.toSet()
 
@@ -287,6 +301,16 @@ object LetterReader {
             val strong = mentioned.filter { it in setOf("energie", "voda", "televize", "rozhlas", "daň") }
             if (group(k.what) !in mentioned && strong.isNotEmpty())
                 warn += "Tváří se jako ${k.name}, ale chce peníze za ${whatRules.first { group(it.second) == strong.first() && it.first.containsMatchIn(text) }.second}. To k sobě nesedí."
+        }
+        if (headerConflict) warn += "Na dopise je ${header} i ${k!!.name}. Nejsem si jistá, kdo ho poslal."
+        // Jistota: u dopisu, který chce peníze, musím přečíst odesílatele, částku i termín. Jinak nehádám.
+        if ((kind == Kind.PAY || kind == Kind.DEBT) && warn.isEmpty()) {
+            val missing = listOfNotNull(
+                if (k == null) "odesílatele" else null,
+                if (amount == null) "částku" else null,
+                if (due == null) "termín" else null,
+            )
+            if (missing.isNotEmpty()) warn += "Nepřečetla jsem jistě ${missing.joinToString(", ").replace(Regex(", (?=[^,]*$)"), " ani ")}. Ať se na dopis podívá rodina."
         }
         // Velká částka: radši ať se podívá rodina
         if ((kind == Kind.PAY || kind == Kind.DEBT) && (amount ?: 0L) >= 1_000_000L && warn.isEmpty())
@@ -320,7 +344,8 @@ object LetterReader {
     /** Odesílatel podle hlavičky: řádek s „s.r.o.“, „a.s.“, „úřad“… nebo první řádek. */
     private fun guessSender(lines: List<String>): String? {
         val firm = Regex("(s\\.\\s?r\\.\\s?o\\.|a\\.\\s?s\\.|spol\\.|úřad|urad|z\\.\\s?s\\.|o\\.\\s?p\\.\\s?s\\.|družstvo|bank)", RegexOption.IGNORE_CASE)
-        return lines.take(15).firstOrNull { firm.containsMatchIn(it) && it.length in 4..60 }
+        val notName = Regex("spojení|spojeni|účet|účt|ucet|číslo|cislo|symbol|splatn|\\d{4,}", RegexOption.IGNORE_CASE)
+        return lines.take(15).firstOrNull { firm.containsMatchIn(it) && it.length in 4..60 && !notName.containsMatchIn(it) }
             ?.replace(Regex(",?\\s*(IČO?|DIČ).*$", RegexOption.IGNORE_CASE), "")?.trim()?.trimEnd(',')
     }
 
