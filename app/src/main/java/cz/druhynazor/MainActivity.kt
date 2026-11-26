@@ -346,7 +346,7 @@ class MainActivity : Activity() {
         p.edit().putBoolean("ohlaseno", true).apply()
         Family.sms(this, "Postaráno: Na telefonu ${prefs.seniorGenitive} přibyl pomocník Dopisy. Na úvodní obrazovce je dlaždice Dopis: " +
             "stačí namířit telefon na dopis a aplikace nahlas řekne, o co jde, jestli je pravý a co udělat. " +
-            "Tlačítkem Poslat rodině vám přijde shrnutí a fotka dopisu. Podezřelý dopis vám pošle sama.")
+            "Tlačítkem Poslat rodině vám přijde SMS se shrnutím dopisu, fotku vám může poslat přes WhatsApp. Podezřelý dopis vám pošle sama.")
     }
 
     @Deprecated("Activity API")

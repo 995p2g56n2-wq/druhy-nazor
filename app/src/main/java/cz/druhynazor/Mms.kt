@@ -8,8 +8,10 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.database.Cursor
+import android.database.MatrixCursor
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.provider.OpenableColumns
 import android.telephony.SmsManager
 import android.util.Log
 import java.io.ByteArrayOutputStream
@@ -40,8 +42,7 @@ object Mms {
                 val sent = PendingIntent.getBroadcast(ctx, 7000 + i,
                     Intent(ctx, MmsSentReceiver::class.java).putExtra("soubor", name),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
-                @Suppress("DEPRECATION")
-                val sm = ctx.getSystemService(SmsManager::class.java) ?: SmsManager.getDefault()
+                val sm = Family.smsManager(ctx)
                 sm.sendMultimediaMessage(ctx, uri, null, null, sent)
                 Log.i("DruhyNazor", "MMS s fotkou dopisu odeslána ke zpracování")
             } catch (e: Exception) {
@@ -121,22 +122,37 @@ class MmsSentReceiver : BroadcastReceiver() {
     }
 }
 
-/** Zpřístupní připravenou MMS telefonu, aby ji mohl odeslat. Nic jiného nezpřístupní. */
+/** Zpřístupní připravenou MMS telefonu a fotku dopisu WhatsAppu. Nic jiného nezpřístupní. */
 class MmsFileProvider : ContentProvider() {
     override fun onCreate() = true
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
         val ctx = context ?: return null
         val name = uri.lastPathSegment ?: return null
-        if (!name.matches(Regex("mms-[0-9a-z-]+\\.pdu"))) return null
+        if (!name.matches(NAME)) return null
         val f = File(Mms.dir(ctx), name)
         if (!f.exists()) return null
         return ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY)
     }
 
-    override fun query(uri: Uri, p: Array<out String>?, s: String?, a: Array<out String>?, o: String?): Cursor? = null
-    override fun getType(uri: Uri) = "application/vnd.wap.mms-message"
+    /** WhatsApp se ptá na jméno a velikost souboru. */
+    override fun query(uri: Uri, p: Array<out String>?, s: String?, a: Array<out String>?, o: String?): Cursor? {
+        val ctx = context ?: return null
+        val name = uri.lastPathSegment?.takeIf { it.matches(NAME) } ?: return null
+        val f = File(Mms.dir(ctx), name)
+        if (!f.exists()) return null
+        return MatrixCursor(arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE)).apply {
+            addRow(arrayOf<Any>(if (name.endsWith(".jpg")) "dopis.jpg" else name, f.length()))
+        }
+    }
+    override fun getType(uri: Uri) =
+        if (uri.lastPathSegment?.endsWith(".jpg") == true) "image/jpeg" else "application/vnd.wap.mms-message"
     override fun insert(uri: Uri, values: ContentValues?): Uri? = null
     override fun delete(uri: Uri, s: String?, a: Array<out String>?) = 0
     override fun update(uri: Uri, v: ContentValues?, s: String?, a: Array<out String>?) = 0
+
+    companion object {
+        /** Jen připravené MMS a fotky dopisu pro WhatsApp, nic jiného. */
+        private val NAME = Regex("(mms-[0-9a-z-]+\\.pdu|wa-[0-9a-z]+\\.jpg)")
+    }
 }
