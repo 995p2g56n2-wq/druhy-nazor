@@ -61,6 +61,20 @@ PROTECTED_NUMBERS = {
 
 # Výjimky: čísla a stránky, které někdo nechal vyřadit (omylem nahlášené). Nikdy se nezveřejní.
 VYJIMKY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vyjimky.txt")
+# Adresa serveru na čtení dopisů (server/dopisy). Prázdná = aplikace čte dopisy jen v telefonu.
+DOPISY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dopisy-adresa.txt")
+
+
+def dopisy_server():
+    try:
+        with open(DOPISY_PATH, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("https://"):
+                    return line.rstrip("/")
+    except FileNotFoundError:
+        pass
+    return ""
 
 
 def load_exceptions(path: str = VYJIMKY_PATH) -> set:
@@ -336,6 +350,7 @@ def main():
         "phish_retez": state.get("verejne", {}).get("phish_retez", []),
         "nova_hlaseni": counted,
         "cekajici": sum(1 for it in state.get("polozky", {}).values() if "x" not in it),
+        "dopisy_server": dopisy_server(),
     }
     with open(os.path.join(folder, "info.json"), "w", encoding="utf-8") as f:
         json.dump(info, f, ensure_ascii=False, indent=1)

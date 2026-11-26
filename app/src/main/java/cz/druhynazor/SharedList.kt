@@ -334,7 +334,7 @@ object SharedList {
                     val phishVer = info.optString("phish_verze")
                     val haveVer = p.getString("phish_verze", null)
                     if (phishVer.isNotEmpty() && phishVer != haveVer) updatePhish(app, info, haveVer, force)
-                    p.edit().putLong("stazeno", System.currentTimeMillis()).apply()
+                    p.edit().putLong("stazeno", System.currentTimeMillis()).putString("dopisy_server", info.optString("dopisy_server")).apply()
                     ok = true
                 }
             } catch (e: Exception) {

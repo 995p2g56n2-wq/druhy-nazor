@@ -1,0 +1,3 @@
+# Adresa serveru na čtení dopisů přes Claude (složka server/dopisy, běží u Cloudflare).
+# Napište ji na samostatný řádek, třeba https://postarano-dopisy.jmeno.workers.dev
+# Dokud tu žádná není, aplikace čte dopisy jen v telefonu.

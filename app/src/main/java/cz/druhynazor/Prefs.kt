@@ -56,6 +56,14 @@ class Prefs(context: Context) {
         get() = p.getInt("souhlas_verze", 0)
         set(v) = p.edit().putInt("souhlas_verze", v).apply()
 
+    /**
+     * Jak číst dopisy: 0 = jen v telefonu, 1 = Základní umělá inteligence, 2 = Přesnější.
+     * -1 = zatím nevybráno (při prvním otevření Dopisu se ukáže upozornění a volba).
+     */
+    var letterMode: Int
+        get() = p.getInt("dopisy_rezim", -1)
+        set(v) = p.edit().putInt("dopisy_rezim", v).apply()
+
     /** Hlásit čísla podvodníků do společného seznamu (jde vypnout v Pro rodinu). */
     var shareReports: Boolean
         get() = p.getBoolean("hlasit_do_seznamu", true)

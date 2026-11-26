@@ -39,7 +39,7 @@ import kotlin.concurrent.thread
  */
 class LetterActivity : Activity() {
 
-    private enum class Screen { SCAN, CHOOSE, READING, RESULT, UNREADABLE, MORE, REMIND }
+    private enum class Screen { SCAN, CHOOSE, READING, RESULT, UNREADABLE, MORE, REMIND, NOTICE }
 
     private var screen = Screen.SCAN
     private lateinit var speaker: Speaker
@@ -66,7 +66,34 @@ class LetterActivity : Activity() {
         if (savedInstanceState != null) { render(); return }
         // Dopis poslaný z jiné aplikace (Fotky, Soubory, e-mail): rovnou přečíst
         val shared = sharedUris(intent)
-        if (shared.isNotEmpty()) openFiles(shared) else scan()
+        // Poprvé: upozornění, že dopis čte umělá inteligence, a volba
+        if (AiLetters.available(this) && Prefs(this).letterMode < 0) {
+            pendingShared = shared; screen = Screen.NOTICE; render(); return
+        }
+        start(shared)
+    }
+
+    private var pendingShared: List<Uri> = emptyList()
+
+    private fun start(shared: List<Uri>) { if (shared.isNotEmpty()) openFiles(shared) else scan() }
+
+    /** Upozornění při prvním otevření Dopisu: kdo dopis čte a že se může splést. */
+    private fun notice(root: LinearLayout) {
+        spacer(root, 24)
+        root.addView(Ui.text(this, "📄", 64f, center = true))
+        val head = "Dopis čte umělá inteligence. Může se splést. U peněz se vždycky poraďte s rodinou."
+        root.addView(Ui.text(this, head, 24f, bold = true, center = true))
+        root.addView(Ui.text(this, "Pošle se jen text dopisu, ne fotka, a bez rodných čísel. Přečte ho Claude od firmy Anthropic. Změnit to jde v Pro rodinu.", 19f, center = true, color = Ui.MUTED))
+        say("$head Teď ťukněte dole na Rozumím a souhlasím.")
+        spacer(root, 12)
+        root.addView(Ui.button(this, "Rozumím a souhlasím") { pickMode(AiLetters.MODE_BASIC) })
+        root.addView(Ui.button(this, "Nechci, číst jen v telefonu", Ui.CARD, Ui.INK, sp = 18f) { pickMode(AiLetters.MODE_PHONE) })
+    }
+
+    private fun pickMode(mode: Int) {
+        Prefs(this).letterMode = mode
+        speaker.stop()
+        start(pendingShared)
     }
 
     private fun sharedUris(i: Intent?): List<Uri> {
@@ -221,7 +248,17 @@ class LetterActivity : Activity() {
     private fun onRead(text: String) {
         if (isFinishing) return
         if (text.trim().length < 40) { screen = Screen.UNREADABLE; spoken = null; render(); return }
-        var l = LetterReader.read(text)
+        if (AiLetters.shouldUse(this)) {
+            thread(name = "dopis-ai") {
+                val hints = AiLetters.ask(this, text)
+                runOnUiThread { showLetter(text, hints) }
+            }
+        } else showLetter(text, null)
+    }
+
+    private fun showLetter(text: String, hints: LetterReader.AiHints?) {
+        if (isFinishing) return
+        var l = LetterReader.read(text, LocalDate.now(), hints)
         l = withSharedList(l)
         letter = l
         saved = LetterStore.save(this, l, pages.firstOrNull())
@@ -257,6 +294,7 @@ class LetterActivity : Activity() {
             Screen.UNREADABLE -> unreadable(root)
             Screen.MORE -> more(root)
             Screen.REMIND -> remind(root)
+            Screen.NOTICE -> notice(root)
         }
         setContentView(ScrollView(this).apply { setBackgroundColor(Ui.BG); isFillViewport = true; addView(root) })
     }
@@ -386,7 +424,9 @@ class LetterActivity : Activity() {
         spacer(root, 16)
         root.addView(Ui.text(this, "Více o dopisu", 28f, bold = true, center = true))
         val card = Ui.card(this, 12)
-        val lines = LetterReader.more(l)
+        val lines = LetterReader.more(l) + listOfNotNull(
+            if (l.aiModel != null) "Dopis četla umělá inteligence a telefon to zkontroloval." else AiLetters.lastProblem,
+        )
         lines.forEach { card.addView(Ui.text(this, it, 21f)) }
         root.addView(card)
         say(lines.joinToString(" ") + " Teď ťukněte dole na Zpět.")

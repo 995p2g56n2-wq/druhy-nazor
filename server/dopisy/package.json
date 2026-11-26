@@ -1,0 +1,19 @@
+{
+  "name": "postarano-dopisy",
+  "private": true,
+  "description": "Postaráno: malý server, který přečte text dopisu přes Claude. Klíč zůstává tady, ne v aplikaci.",
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "kontrola": "tsc --noEmit",
+    "mereni": "node mereni.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.10.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261110.1",
+    "typescript": "5.9.3",
+    "wrangler": "4.160.0"
+  }
+}

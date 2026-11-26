@@ -126,6 +126,32 @@ class DruhyNazorActivity : Activity() {
         }
         root.addView(call)
 
+        // ---- Čtení dopisů ----
+        if (AiLetters.available(this)) {
+            val letters = Ui.card(this)
+            letters.addView(Ui.text(this, "Čtení dopisů", 22f, bold = true))
+            letters.addView(Ui.text(this,
+                "Umělá inteligence (Claude) přečte dopis lépe než samotný telefon. Pošle se jen text dopisu, ne fotka, " +
+                    "a bez rodných čísel. Telefon pak každý údaj zkontroluje s dopisem. Může se splést, u peněz se poraďte s rodinou.",
+                17f, color = Ui.MUTED))
+            val mode = prefs.letterMode
+            listOf(
+                AiLetters.MODE_BASIC to "Základní (zdarma)",
+                AiLetters.MODE_BETTER to "Přesnější (zatím zdarma na vyzkoušení)",
+                AiLetters.MODE_PHONE to "Jen v telefonu (nic se neposílá)",
+            ).forEach { (m, label) ->
+                val on = mode == m || (mode < 0 && m == AiLetters.MODE_BASIC)
+                letters.addView(Ui.button(this, (if (on) "✓  " else "") + label, if (on) Ui.ACCENT else Ui.CARD,
+                    if (on) android.graphics.Color.WHITE else Ui.ACCENT, sp = 17f) {
+                    prefs.letterMode = m; render()
+                })
+            }
+            letters.addView(Ui.text(this,
+                "Tento měsíc přečteno: ${AiLetters.usedThisMonth(this)} z ${AiLetters.FREE_PER_MONTH} dopisů. Potom se čte jen v telefonu.",
+                16f, color = Ui.MUTED))
+            root.addView(letters)
+        }
+
         // ---- Společný seznam podvodníků ----
         val share = Ui.card(this)
         share.addView(Ui.text(this, "Společný seznam podvodníků", 22f, bold = true))

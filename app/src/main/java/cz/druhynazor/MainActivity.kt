@@ -166,8 +166,9 @@ class MainActivity : Activity() {
         })
         spacer(root, 16)
         root.addView(Ui.text(this,
-            "Varování je pomůcka a nepozná úplně každý podvod. Text zpráv ani dopisů nikam neposíláme, " +
-                "jen rodině v SMS. Hlášení do společného seznamu jde vypnout v části Pro rodinu.",
+            "Varování je pomůcka a nepozná úplně každý podvod. Text zpráv nikam neposíláme, jen rodině v SMS. " +
+                "Dopis přečte umělá inteligence, jen když s tím u dopisu souhlasíte. " +
+                "Hlášení do společného seznamu jde vypnout v části Pro rodinu.",
             16f, center = true, color = Ui.MUTED))
     }
 
