@@ -345,8 +345,9 @@ object LetterReader {
     private fun guessSender(lines: List<String>): String? {
         val firm = Regex("(s\\.\\s?r\\.\\s?o\\.|a\\.\\s?s\\.|spol\\.|úřad|urad|z\\.\\s?s\\.|o\\.\\s?p\\.\\s?s\\.|družstvo|bank)", RegexOption.IGNORE_CASE)
         val notName = Regex("spojení|spojeni|účet|účt|ucet|číslo|cislo|symbol|splatn|\\d{4,}", RegexOption.IGNORE_CASE)
-        return lines.take(15).firstOrNull { firm.containsMatchIn(it) && it.length in 4..60 && !notName.containsMatchIn(it) }
-            ?.replace(Regex(",?\\s*(IČO?|DIČ).*$", RegexOption.IGNORE_CASE), "")?.trim()?.trimEnd(',')
+        val ico = Regex(",?\\s*(IČO?|DIČ).*$", RegexOption.IGNORE_CASE)
+        return lines.take(15).map { it.replace(ico, "").trim().trimEnd(',') }
+            .firstOrNull { firm.containsMatchIn(it) && it.length in 4..60 && !notName.containsMatchIn(it) }
     }
 
     // ---------- Věty pro seniora ----------
