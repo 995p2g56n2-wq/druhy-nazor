@@ -14,6 +14,44 @@ export interface Env {
   ANTHROPIC_API_KEY: string;
   /** Klíč aplikace z wrangler.jsonc. */
   POSTARANO_KLIC: string;
+  /** Kanál v aplikaci ntfy pro upozornění správci (wrangler.jsonc). */
+  NTFY_TEMA?: string;
+}
+
+/** Upozornění správci do aplikace ntfy, nejvýš jednou za 6 hodin. */
+const UPOZORNENI: Record<string, { nadpis: string; text: string }> = {
+  kredit: {
+    nadpis: "Postaráno: došel kredit u Anthropic",
+    text: "Dopisy se teď čtou jen v telefonu. Dobijte kredit: console.anthropic.com, Settings, Billing, Buy credits. " +
+      "Nebo je dosažený měsíční strop útraty (Settings, Limits).",
+  },
+  "spatny-klic": {
+    nadpis: "Postaráno: klíč k Claude nefunguje",
+    text: "Dopisy se teď čtou jen v telefonu. Vytvořte nový klíč na console.anthropic.com (API Keys) a vložte ho " +
+      "u Cloudflare do Settings, Variables and Secrets jako ANTHROPIC_API_KEY.",
+  },
+  nenastaveno: {
+    nadpis: "Postaráno: chybí klíč k Claude",
+    text: "U Cloudflare v Settings, Variables and Secrets chybí ANTHROPIC_API_KEY. Dopisy se čtou jen v telefonu.",
+  },
+};
+
+async function upozornit(env: Env, chyba: string): Promise<void> {
+  const zprava = UPOZORNENI[chyba];
+  const tema = env.NTFY_TEMA;
+  if (!zprava || !tema) return;
+  try {
+    // ntfy si zprávy pamatuje 12 hodin: když už za posledních 6 hodin jedna odešla, další neposílat
+    const minule = await fetch(`https://ntfy.sh/${tema}/json?poll=1&since=6h`);
+    if (minule.ok && (await minule.text()).trim()) return;
+    await fetch("https://ntfy.sh/", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ topic: tema, title: zprava.nadpis, message: zprava.text, priority: 4, tags: ["warning"] }),
+    });
+  } catch (e) {
+    console.log("Upozornění se nepodařilo poslat:", e);
+  }
 }
 
 /** Základní = levný a rychlý, Přesnější = nejschopnější model. */
@@ -67,7 +105,18 @@ function odpoved(data: unknown, status = 200): Response {
 }
 
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const res = await obsluha(req, env);
+    if (res.status >= 400) {
+      const chyba = ((await res.clone().json().catch(() => ({}))) as { chyba?: string }).chyba;
+      if (chyba) ctx.waitUntil(upozornit(env, chyba));
+    }
+    return res;
+  },
+};
+
+async function obsluha(req: Request, env: Env): Promise<Response> {
+  {
     const url = new URL(req.url);
     if (req.method === "GET" && url.pathname === "/") return odpoved({ ok: true, sluzba: "postarano-dopisy" });
     if (req.method !== "POST" || url.pathname !== "/dopis") return odpoved({ ok: false, chyba: "neznama-adresa" }, 404);
@@ -141,5 +190,5 @@ export default {
       console.log("Chyba:", e);
       return odpoved({ ok: false, chyba: "server" }, 500);
     }
-  },
-};
+  }
+}
