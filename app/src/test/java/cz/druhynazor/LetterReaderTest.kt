@@ -236,6 +236,7 @@ Datum splatnosti
     @Test fun kratkaRada() {
         assertEquals("Jedna. Dvě.", LetterReader.shortAdvice("Jedna. Dvě. Tři."))
         assertEquals("Bez tečky.", LetterReader.shortAdvice("Bez tečky"))
+        assertEquals("Přijďte 14. ledna v 9 hodin. Vezměte si průkaz.", LetterReader.shortAdvice("Přijďte 14. ledna v 9 hodin. Vezměte si průkaz. A ještě."))
     }
 
     @Test fun rodneCisloSeNeposila() {

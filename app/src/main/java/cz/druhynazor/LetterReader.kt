@@ -258,7 +258,8 @@ object LetterReader {
 
     /** Nejvýš dvě věty a 220 znaků. */
     fun shortAdvice(raw: String): String {
-        val sentences = Regex("[^.!?]+[.!?]?").findAll(raw.trim()).map { it.value.trim() }.filter { it.isNotEmpty() }.toList()
+        // Věta končí tečkou, za kterou je mezera a velké písmeno (ne „31. prosince“)
+        val sentences = raw.trim().split(Regex("(?<=[.!?])\\s+(?=[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ])")).map { it.trim() }.filter { it.isNotEmpty() }
         var out = ""
         for (sn in sentences.take(2)) {
             val next = if (out.isEmpty()) sn else "$out $sn"
