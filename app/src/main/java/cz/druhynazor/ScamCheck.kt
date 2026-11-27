@@ -45,10 +45,35 @@ object ScamCheck {
             "Chce kód", "Chce kód, PIN nebo heslo. Banka se na ně nikdy neptá.", danger = true),
         Rule(r("(z banky|vaše banka|vase banka|bankovní účet|bankovni ucet|policie|policist)"), 2,
             "Banka / policie", "Vydává se za banku nebo policii.", danger = true),
-        Rule(r("(do 24 hodin|ihned|okamžitě|okamzite|naléhav|naleha|posledni vyzva|poslední výzva)"), 1,
+        Rule(r("(do 24 hodin|ihned|\\bhned\\b|rychle|spěch|spech|okamžitě|okamzite|naléhav|naleha|posledni vyzva|poslední výzva)"), 1,
             "Spěchá", "Tlačí vás ke spěchu, abyste nestihli přemýšlet."),
         Rule(r("(whatsapp|telegram)"), 1,
             "Jinam psát", "Chce, abyste psali jinam.", danger = true),
+        // Typické podvody přes Messenger a Facebook: ukradený účet kamaráda nebo vnoučete, bazar, „Jsi to ty?“
+        Rule(r("((půjč|pujc)\\p{L}*.{0,40}(\\d{3}|peníz|penez|penize|korun|kč\\b|kc\\b|tisíc|tisic|litr|stovk)|" +
+                "(\\d{3}|peníz|penez|penize|korun|tisíc|tisic|litr|stovk).{0,40}(půjč|pujc))"), 4,
+            "Chce půjčit", "Chce půjčit peníze. Účet kamaráda nebo vnoučete mohl někdo ukrást. Zavolejte mu na číslo, které znáte.",
+            danger = true),
+        Rule(r("((pošl|posl|přepiš|prepis|napiš|napis)\\p{L}* (mi )?(ho |ten |ty |to |tu )?(kód|kod|číslo z sms|cislo z sms)|" +
+                "(přišel|prisel|přijde|prijde|dorazil) ti (\\p{L}+ )?(kód|kod)|(omylem|omylu).{0,40}(kód|kod|sms)|" +
+                "\\dmístný kód|\\dmistny kod|ciferný kód|ciferny kod)"), 4,
+            "Kód z SMS", "Chce kód, který vám přišel v SMS. S ním vám ukradne účet nebo peníze. Nikomu ho neposílejte.",
+            danger = true),
+        Rule(r("(hlasuj|hlasoval|hlasování|hlasovani|dej\\p{L}* (mi |ji |jí |mu )?hlas|soutěž\\p{L}* (o |pro )|soutez\\p{L}* (o |pro ))"), 2,
+            "Hlasování", "Prosí o hlas v soutěži. Přes takový odkaz podvodníci kradou účty na Facebooku."),
+        Rule(r("((jsi|si|seš|ses) (to )?ty (na|v|ve) (tom |té |te |tý |ty |tomhle |tomto |této |teto )?(vide|fot|klip)|" +
+                "podívej (se )?(co|jak) o tobě|podivej (se )?(co|jak) o tobe)"), 3,
+            "Jsi to ty?", "Láká na video nebo fotku „s vámi“. Za odkazem bývá falešné přihlášení k Facebooku."),
+        Rule(r("(přijetí platby|prijeti platby|přijmout (platbu|peníze)|prijmout (platbu|penize)|obdržet (platbu|peníze)|" +
+                "obdrzet (platbu|penize)|vyzvedn\\p{L}* (si )?(platbu|peníze|penize))"), 4,
+            "Za prodej", "Slibuje vám peníze za prodej přes odkaz. Kdo chce opravdu zaplatit, nepotřebuje údaje z vaší karty.",
+            danger = true),
+        Rule(r("((účet|ucet|stránk\\p{L}*|strank\\p{L}*) (bude |byl |byla )(\\p{L}+ )?(zablokov|smaz|deaktiv|zrušen|zrusen|pozastav)|" +
+                "porušen\\p{L}* (zásad|pravidel|autorsk)|poruseni (zasad|pravidel|autorsk)|meta support|facebook support|" +
+                "tým facebook|tym facebook)"), 2,
+            "Zablokování", "Straší zablokováním účtu. Facebook takové zprávy přes chat neposílá.", danger = true),
+        Rule(r("(fotk\\p{L}*|foto|vyfo\\p{L}*) (\\p{L}+ )?(občank|obcank|občansk|obcansk|pasu|karty|kartu|platební|platebni)"), 4,
+            "Chce doklad", "Chce fotku dokladu nebo platební karty. To nikomu neposílejte.", danger = true),
         Rule(r("(vyhr[aá]l|výhr|bitcoin|kryptom|investic|zhodnocení)"), 3,
             "Výhra / investice", "Slibuje výhru nebo snadný zisk."),
         Rule(r("(česká pošta|ceska posta|zásilk|zasilk|balík|balik|\\bppl\\b|\\bdpd\\b|zásilkovn)"), 1,
