@@ -104,6 +104,9 @@ class DruhyNazorActivity : Activity() {
 
         root.addView(FamilyUi.card(this) { render() })
 
+        // ---- Léky, Jsem v pořádku, Pomoc ----
+        CareUi.cards(this, root) { render() }
+
         // ---- Jak seniorovi říkají ----
         val call = Ui.card(this)
         call.addView(Ui.text(this, "Jak mu v rodině říkáte", 22f, bold = true))
@@ -226,6 +229,11 @@ class DruhyNazorActivity : Activity() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         if (FamilyUi.onResult(this, requestCode, resultCode, data)) render()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == CareUi.REQ_HELP_PERMS) render()
     }
 
     /** Zpět na úvodní obrazovku, i když se Druhý názor otevřel z upozornění. */

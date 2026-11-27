@@ -15,6 +15,12 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Pomoc: zavolat rodině a poslat, kde senior je -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Léky a Jsem v pořádku: připomenout na minutu přesně -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
@@ -84,6 +90,23 @@
         </activity>
 
         <receiver android:name=".LetterReminderReceiver" android:exported="false" />
+        <receiver android:name=".CareReceiver" android:exported="false" />
+        <activity
+            android:name=".CareActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="cz.druhynazor.pece"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".HelpActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait" />
         <receiver android:name=".MmsSentReceiver" android:exported="false" />
 
         <!-- Připravená MMS s fotkou dopisu pro rodinu (čte ji jen telefon při odesílání) -->
@@ -179,6 +202,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
     </application>

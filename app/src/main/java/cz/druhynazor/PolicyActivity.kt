@@ -44,16 +44,22 @@ class PolicyActivity : Activity() {
                 "•  fotky dopisů (text z fotky čte nástroj Google ML Kit přímo v telefonu, fotka se smaže po 60 dnech),\n" +
                 "•  text dopisů, pokud jste nezapnuli čtení umělou inteligencí (viz bod 4),\n" +
                 "•  jména a čísla lidí z rodiny, které jste vybrali, a jejich rozhodnutí o zprávách,\n" +
-                "•  připomínky plateb.\n\n" +
+                "•  připomínky plateb,\n" +
+                "•  léky a časy připomínek, které zadala rodina, a jestli jste lék potvrdili,\n" +
+                "•  odpovědi na otázku Jak se máte.\n\n" +
+                "Polohu telefon zjišťuje jen ve chvíli, kdy zmáčknete Pomoc. Jinak ji nesleduje ani neukládá.\n\n" +
                 "Tyto údaje nevidíme my ani nikdo jiný. Smažete je odinstalováním.",
 
             "3. Upozornění rodině (SMS a MMS)" to
-                "Co: text podezřelé zprávy, číslo odesílatele, shrnutí nebo fotka dopisu.\n" +
+                "Co: text podezřelé zprávy, číslo odesílatele, shrnutí nebo fotka dopisu. " +
+                "Dále: název léku, když ho do hodiny nepotvrdíte (to je údaj o zdraví), odpověď Není mi dobře " +
+                "nebo to, že jste do určené doby neodpověděli na Jak se máte, a po zmáčknutí Pomoc odkaz na mapu s místem, kde jste.\n" +
                 "Komu: jen lidem z rodiny, které jste vybrali, přes vašeho mobilního operátora.\n" +
                 "Proč: aby vám rodina mohla poradit.\n" +
                 "Jak dlouho: v telefonech rodiny, dokud zprávu nesmažou.\n" +
-                "Právní důvod: váš souhlas (čl. 6 odst. 1 písm. a) GDPR). Souhlas můžete kdykoli odvolat odinstalováním " +
-                "nebo odebráním lidí z rodiny v části Pro rodinu.",
+                "Právní důvod: váš souhlas (čl. 6 odst. 1 písm. a) GDPR), u léků výslovný souhlas (čl. 9 odst. 2 písm. a) GDPR). " +
+                "Souhlas můžete kdykoli odvolat odinstalováním, odebráním lidí z rodiny nebo vypnutím Léků, " +
+                "Jsem v pořádku a Pomoci v části Pro rodinu.",
 
             "4. Čtení dopisů umělou inteligencí" to
                 "Zapíná se jen s vaším souhlasem při prvním otevření Dopisu. Bez souhlasu se dopis čte jen v telefonu.\n" +
