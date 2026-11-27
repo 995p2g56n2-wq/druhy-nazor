@@ -60,10 +60,12 @@ class MainActivity : Activity() {
         if (Modules.DN in Modules.installed(this) && DnSetupActivity.permsGranted(this)) GuardService.start(this)
         render()
         if (screen == Screen.HOME && !letterPrepared) { letterPrepared = true; LetterActivity.prepare(this) }
+        // Léky a Jsem v pořádku: budíky naplánovat (nic se nezdvojí)
+        Care.restore(this)
         // Hlídání po spuštění chvíli nabíhá (třeba po aktualizaci), stav pak zkontrolovat znovu.
         // Teprve potom případně dát vědět rodině, že ochrana není celá zapnutá.
         window.decorView.postDelayed({
-            if (screen == Screen.HOME && !isFinishing) { render(); alertFamilyIfNeeded(); announceLetters() }
+            if (screen == Screen.HOME && !isFinishing) { render(); alertFamilyIfNeeded(); announceLetters(); Care.announce(this) }
         }, 3000)
     }
 
@@ -168,7 +170,8 @@ class MainActivity : Activity() {
         root.addView(Ui.text(this,
             "Varování je pomůcka a nepozná úplně každý podvod. Text zpráv nikam neposíláme, jen rodině v SMS. " +
                 "Dopis přečte umělá inteligence, jen když s tím u dopisu souhlasíte. " +
-                "Hlášení do společného seznamu jde vypnout v části Pro rodinu.",
+                "Léky, odpověď na Jak se máte a místo, kde jste, když zmáčknete Pomoc, dostane jen rodina v SMS. " +
+                "Hlášení do společného seznamu a každého pomocníka jde vypnout v části Pro rodinu.",
             16f, center = true, color = Ui.MUTED))
     }
 
@@ -301,7 +304,7 @@ class MainActivity : Activity() {
         if (Modules.DOPIS in Modules.installed(this)) tiles += "📄\nDopis" to {
             startActivity(Intent(this, LetterActivity::class.java))
         }
-        // Další hotoví pomocníci (Energie) sem přibydou sami.
+        // Další hotoví pomocníci sem přibydou sami.
         tiles.chunked(2).forEach { pair ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             pair.forEachIndexed { i, (label, open) ->
@@ -317,6 +320,13 @@ class MainActivity : Activity() {
                 })
             }
             root.addView(row)
+        }
+
+        // Pomoc: velké červené tlačítko přes celou šířku
+        if (Care.enabled(this, Care.POMOC)) {
+            root.addView(Ui.button(this, "🆘  Pomoc", Ui.BAD, android.graphics.Color.WHITE, sp = 30f) {
+                startActivity(Intent(this, HelpActivity::class.java))
+            }.apply { minHeight = dp(120) })
         }
 
         spacer(root, 24)
@@ -363,7 +373,7 @@ class MainActivity : Activity() {
     companion object {
         private const val REQ_DN_SETUP = 20
         /** Zvýšit, když se změní, co se posílá ven. Senior pak souhlasí znovu. */
-        const val CONSENT_VERSION = 2
+        const val CONSENT_VERSION = 3
         private const val DAY = 24L * 3600 * 1000
     }
 }
