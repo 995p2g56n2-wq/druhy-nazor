@@ -3,6 +3,8 @@ name: Sestavit aplikaci
 on:
   push:
     branches: [main]
+    # Změna jen na serveru (seznam, čtení dopisů) nevydává novou aplikaci
+    paths-ignore: ["server/**"]
   # Kontrola návrhu změn: jen sestavit, nic nezveřejňovat
   pull_request:
   workflow_dispatch:

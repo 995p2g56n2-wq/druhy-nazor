@@ -1,0 +1,11 @@
+{
+  // Cloudflare Worker: https://postarano-dopisy.<vaše-jméno>.workers.dev
+  "name": "postarano-dopisy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Klíč aplikace (není tajný, jen odradí náhodné návštěvníky). Klíč k Claude se zadává
+  // v Cloudflare jako tajná proměnná ANTHROPIC_API_KEY, nikdy ne sem.
+  "vars": { "POSTARANO_KLIC": "postarano-dopisy-v1" }
+}

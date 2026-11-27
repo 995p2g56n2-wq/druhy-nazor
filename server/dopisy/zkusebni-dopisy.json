@@ -1,0 +1,122 @@
+[
+ {
+  "nazev": "Dobrá energie – faktura",
+  "text": "Dobrá energie s.r.o.\nNa Florenci 2116/15, 110 00 Praha 1\nwww.dobraenergie.cz\nFaktura - vyúčtování elektřiny\nRozpis plateb za období 1. 11. 2025 - 31. 10. 2026\nCelkem k úhradě\n1 850,00 Kč\nDatum splatnosti\n12. 12. 2026\nBankovní spojení: 19-2000145399/0800\nVariabilní symbol: 2026114455",
+  "ocekavano": {
+   "odesilatel": "Dobrá energie",
+   "castka": "1850",
+   "splatnost": "2026-12-12",
+   "podvod": false
+  }
+ },
+ {
+  "nazev": "Dobrá energie – upomínka bez termínu",
+  "text": "Dobrá energie s.r.o.\nUpomínka\nRozpis plateb za elektřinu\nNedoplatek k úhradě 15 697,00 Kč\nČíslo účtu 19-2000145399/0800",
+  "ocekavano": {
+   "odesilatel": "Dobrá energie",
+   "castka": "15697",
+   "splatnost": "",
+   "podvod": false
+  }
+ },
+ {
+  "nazev": "Česká televize – poplatek",
+  "text": "Česká televize\nKavčí hory, 140 70 Praha 4\nVýzva k úhradě televizního poplatku\nEvidujeme, že nemáte uhrazen televizní poplatek za období 10/2026 - 12/2026.\nČástka k úhradě: 405,00 Kč\nČíslo účtu: 1-1000-0108/0300\nVariabilní symbol: 1234567890\nDatum splatnosti: 15.12.2026",
+  "ocekavano": {
+   "odesilatel": "Česká televize",
+   "castka": "405",
+   "splatnost": "2026-12-15",
+   "podvod": false
+  }
+ },
+ {
+  "nazev": "ČEZ – vyúčtování",
+  "text": "ČEZ Prodej, a.s.\nVyúčtování elektřiny\nCelkem k úhradě\n2 345,50 Kč\nSplatnost\n30. 11. 2026\nBankovní spojení 19-2000145399/0800",
+  "ocekavano": {
+   "odesilatel": "ČEZ",
+   "castka": "2345,50",
+   "splatnost": "2026-11-30",
+   "podvod": false
+  }
+ },
+ {
+  "nazev": "Výhra s poplatkem – podvod",
+  "text": "Vážený zákazníku, vyhrál jste 500 000 Kč! Pro výplatu výhry uhraďte poplatek 990 Kč na účet DE89370400440532013000 do 24 hodin. Zadejte číslo karty na www.vyhra-cz.top",
+  "ocekavano": {
+   "odesilatel": "",
+   "castka": "990",
+   "splatnost": "",
+   "podvod": true
+  }
+ },
+ {
+  "nazev": "Důchod – zvýšení",
+  "text": "Česká správa sociálního zabezpečení\nOznámení o zvýšení důchodu od ledna 2027. Váš starobní důchod činí 21 456 Kč měsíčně.",
+  "ocekavano": {
+   "odesilatel": "Česká správa sociálního zabezpečení",
+   "castka": "",
+   "splatnost": "",
+   "podvod": false
+  }
+ },
+ {
+  "nazev": "Neznámý vymahač",
+  "text": "Inkaso Rychle s.r.o.\nUpomínka. Dlužná částka 3 990 Kč. Uhraďte do 25.11.2026 na účet 123456789/0800, jinak předáme exekutorovi.",
+  "ocekavano": {
+   "odesilatel": "Inkaso Rychle",
+   "castka": "3990",
+   "splatnost": "2026-11-25",
+   "podvod": null
+  }
+ },
+ {
+  "nazev": "Vymahač za ČEZ",
+  "text": "Inkasní agentura Praha s.r.o.\nVymáháme pohledávku za ČEZ Prodej, a.s.\nDlužná částka 2 300 Kč, uhraďte do 10.12.2026 na účet 19-2000145399/0800",
+  "ocekavano": {
+   "odesilatel": "Inkasní agentura Praha",
+   "castka": "2300",
+   "splatnost": "2026-12-10",
+   "podvod": null
+  }
+ },
+ {
+  "nazev": "Falešná VZP – cizí účet",
+  "text": "Všeobecná zdravotní pojišťovna České republiky\nUpozornění na nedoplatek pojistného 4 870 Kč.\nZaplaťte do 48 hodin na účet LT12 1000 0111 0100 1000, jinak vám zablokujeme kartičku pojištěnce.",
+  "ocekavano": {
+   "odesilatel": "Všeobecná zdravotní pojišťovna",
+   "castka": "4870",
+   "splatnost": "",
+   "podvod": true
+  }
+ },
+ {
+  "nazev": "Reklama",
+  "text": "Kaufland akční nabídka, sleva 30 % jen tento týden. Leták uvnitř.",
+  "ocekavano": {
+   "odesilatel": "Kaufland",
+   "castka": "",
+   "splatnost": "",
+   "podvod": false
+  }
+ },
+ {
+  "nazev": "Banka chce PIN – podvod",
+  "text": "Komerční banka, a.s.\nZ bezpečnostních důvodů ověřte svůj účet. Pošlete číslo platební karty a PIN na adresu kb-overeni@seznam.cz do 24 hodin.",
+  "ocekavano": {
+   "odesilatel": "Komerční banka",
+   "castka": "",
+   "splatnost": "",
+   "podvod": true
+  }
+ },
+ {
+  "nazev": "Voda – nejasné částky",
+  "text": "Vodárny Kladno-Mělník a.s.\nVyúčtování vodného a stočného. Zálohy 1 200 Kč, spotřeba 3 400 Kč.\nSplatnost 10.12.2026",
+  "ocekavano": {
+   "odesilatel": "Vodárny Kladno-Mělník",
+   "castka": "",
+   "splatnost": "2026-12-10",
+   "podvod": false
+  }
+ }
+]
