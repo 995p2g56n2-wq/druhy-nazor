@@ -73,17 +73,25 @@ Tvoje odpověď rozhoduje, jestli senior zaplatí peníze. Chyba ho může stát
 - „jista“ nastav na false, když je text hodně poškozený nebo si nejsi jistý odesílatelem, částkou nebo termínem.
 - Do „podvod“ dej jen konkrétní znaky podvodu, které v dopise opravdu jsou (chce číslo karty, PIN nebo heslo; platbu bitcoiny nebo kupónem; výhra, za kterou se platí; tváří se jako úřad nebo známá firma, ale platí se na cizí účet nebo jinam, než by čekal; odesílatel nesedí k tomu, za co chce peníze).
 - Do „pozor“ dej konkrétní důvody k opatrnosti (výhrůžky, spěch, neznámý vymahač, nesrozumitelné platební údaje, exekuce, soud).
-- Věty piš česky, krátce a jednoduše, jako bys to říkal babičce. Žádné odborné výrazy.`;
+- „shrnuti“: co přišlo a od koho, lidsky, jednou větou (třeba „Pojišťovna chce, abyste jim poslali zprávu od lékaře.“).
+- „rada“: co má senior s dopisem udělat, jednou nebo dvěma krátkými větami. Platí pro každý dopis: od právníka, advokáta, soudu, exekutora, úřadu, pojišťovny, banky, dodavatele energie, lékaře i od firmy.
+  - Když dopis chce, aby něco udělal (odpověděl, doložil, podepsal, přišel, zavolal), řekni co a do kdy; datum opiš z dopisu.
+  - Dopis od advokáta, soudu, exekutora nebo vymahače: ať ho ještě dnes ukáže rodině a nic neplatí ani nepodepisuje, dokud se rodina nepodívá.
+  - Nikdy neraď zaplatit, když si nejsi jistý, nebo když je cokoli podezřelé. Nikdy neraď volat na číslo z podezřelého dopisu.
+  - Vyúčtování energií (elektřina, plyn): řekni, jestli je přeplatek, nebo nedoplatek, a jestli se mění zálohy, když to v dopise je. Přidej, že rodina může porovnat ceny dodavatelů v kalkulátoru Energetického regulačního úřadu, a změna dodavatele může ušetřit. Netvrď, že je cena vysoká, když to z dopisu nepoznáš.
+  - Když není potřeba nic dělat, napiš to („Nic nemusíte dělat, dopis si schovejte.“).
+- Věty piš česky, krátce a jednoduše, jako bys to říkal babičce. Žádné odborné výrazy ani zkratky.`;
 
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["odesilatel", "druh", "za_co", "castka", "splatnost", "ucet", "vs", "podvod", "pozor", "shrnuti", "jista"],
+  required: ["odesilatel", "druh", "za_co", "castka", "splatnost", "ucet", "vs", "podvod", "pozor", "shrnuti", "rada", "jista"],
   properties: {
     odesilatel: { type: "string", description: "Kdo dopis poslal, doslova z textu, nebo \"\"." },
     druh: {
       type: "string",
-      enum: ["platba", "upominka", "exekuce", "soud", "preplatek", "duchod", "reklama", "informace"],
+      enum: ["platba", "upominka", "exekuce", "soud", "preplatek", "duchod", "reklama", "ukol", "informace"],
+      description: "ukol = chce, aby senior něco udělal (odpověděl, doložil, podepsal), ale neplatil.",
     },
     za_co: { type: "string", description: "Za co se platí, krátce ve 4. pádě (elektřinu, vodu, televizní poplatek), nebo \"\"." },
     castka: { type: "string", description: "Částka k zaplacení doslova z textu i s měnou, nebo \"\"." },
@@ -92,7 +100,8 @@ const SCHEMA = {
     vs: { type: "string", description: "Variabilní symbol doslova z textu, nebo \"\"." },
     podvod: { type: "array", items: { type: "string" } },
     pozor: { type: "array", items: { type: "string" } },
-    shrnuti: { type: "string", description: "Jedna jednoduchá věta, o co v dopise jde, nejvýš 20 slov." },
+    shrnuti: { type: "string", description: "Jedna jednoduchá věta, co přišlo a od koho, nejvýš 20 slov." },
+    rada: { type: "string", description: "Co má senior udělat, jedna nebo dvě krátké věty, nejvýš 35 slov." },
     jista: { type: "boolean" },
   },
 } as const;

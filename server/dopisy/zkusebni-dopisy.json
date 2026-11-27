@@ -118,5 +118,100 @@
    "splatnost": "2026-12-10",
    "podvod": false
   }
+ },
+ {
+  "nazev": "Advokát – výzva k úhradě",
+  "text": "JUDr. Petr Novotný, advokát\nVáclavské nám. 12, 110 00 Praha 1\nPředžalobní výzva\nVážená paní,\njménem svého klienta Alza.cz a.s. Vás vyzývám k úhradě dlužné částky 4 380 Kč za nezaplacenou fakturu č. 2026-55871 včetně úroku z prodlení.\nČástku uhraďte do 15. 12. 2026 na účet 2900412233/2010, VS 55871.\nV opačném případě podá můj klient žalobu k soudu, čímž Vám vzniknou další náklady.\nS pozdravem JUDr. Petr Novotný",
+  "ocekavano": {
+   "odesilatel": "Novotný",
+   "castka": "4380",
+   "splatnost": "2026-12-15",
+   "podvod": null,
+   "rada_obsahuje": [
+    "rodin"
+   ],
+   "rada_nesmi": []
+  }
+ },
+ {
+  "nazev": "Pojišťovna – doložit zprávu",
+  "text": "Kooperativa pojišťovna, a.s., Vienna Insurance Group\nPob. Brno, Masarykova 3\nwww.koop.cz\nVěc: Pojistná událost č. 7720045113 – úraz\nVážená paní,\nk vyřízení Vaší pojistné události potřebujeme lékařskou zprávu o ukončení léčení.\nZašlete ji prosím do 31. 12. 2026 poštou na výše uvedenou adresu nebo přes www.koop.cz.\nBez této zprávy nemůžeme pojistné plnění vyplatit.\nS pozdravem, oddělení likvidace",
+  "ocekavano": {
+   "odesilatel": "Kooperativa",
+   "castka": "",
+   "splatnost": "",
+   "podvod": false,
+   "rada_obsahuje": [
+    "lékař",
+    "zpráv"
+   ],
+   "rada_nesmi": [
+    "zaplať"
+   ]
+  }
+ },
+ {
+  "nazev": "Finanční úřad – daň z nemovitosti",
+  "text": "Finanční úřad pro Jihomoravský kraj\nÚzemní pracoviště Brno I\nPlatební výměr na daň z nemovitých věcí na rok 2027\nDaň celkem: 1 245 Kč\nSplatnost: 31. 5. 2027\nČíslo účtu: 711-77628621/0710, variabilní symbol: 8105123456\nwww.financnisprava.cz",
+  "ocekavano": {
+   "odesilatel": "Finanční úřad",
+   "castka": "1245",
+   "splatnost": "2027-05-31",
+   "podvod": false,
+   "rada_obsahuje": [],
+   "rada_nesmi": []
+  }
+ },
+ {
+  "nazev": "Soud – předvolání svědka",
+  "text": "Okresní soud v Kladně\nPředvolání k jednání\nV právní věci žalobce Jana Kratochvíla proti žalovanému Petru Malému o náhradu škody Vás předvoláváme jako svědka k jednání, které se koná dne 14. 1. 2027 v 9:00 hod. v jednací síni č. 12.\nS sebou vezměte občanský průkaz.\nNedostavíte-li se bez omluvy, může Vám být uložena pořádková pokuta.",
+  "ocekavano": {
+   "odesilatel": "Okresní soud",
+   "castka": "",
+   "splatnost": "",
+   "podvod": false,
+   "rada_obsahuje": [
+    "14. 1",
+    "14. ledna",
+    "jednání",
+    "soud"
+   ],
+   "rada_nesmi": [
+    "zaplať"
+   ]
+  }
+ },
+ {
+  "nazev": "Plyn – vyúčtování s přeplatkem",
+  "text": "innogy Energie, s.r.o.\nwww.innogy.cz\nVyúčtování dodávky zemního plynu\nZúčtovací období 1. 11. 2025 - 31. 10. 2026\nZaplacené zálohy: 18 000 Kč\nSkutečná cena: 15 640 Kč\nPřeplatek: 2 360 Kč\nPřeplatek Vám vrátíme do 30 dnů na účet, ze kterého platíte zálohy.\nNová výše zálohy od 1. 12. 2026: 1 300 Kč měsíčně (dosud 1 500 Kč).",
+  "ocekavano": {
+   "odesilatel": "innogy",
+   "castka": "",
+   "splatnost": "",
+   "podvod": false,
+   "rada_obsahuje": [
+    "přeplat",
+    "vrát"
+   ],
+   "rada_nesmi": [
+    "zaplať"
+   ]
+  }
+ },
+ {
+  "nazev": "Elektřina – nedoplatek a vyšší zálohy",
+  "text": "ČEZ Prodej, a.s.\nDuhová 1/425, 140 53 Praha 4\nwww.cez.cz\nVyúčtování elektřiny za období 1. 11. 2025 - 31. 10. 2026\nZaplacené zálohy: 12 000 Kč\nSkutečná cena: 14 870 Kč\nNedoplatek k úhradě: 2 870 Kč\nDatum splatnosti: 10. 12. 2026\nÚčet: 35-4544870267/0100, VS 1188776655\nNové zálohy od 1. 12. 2026: 1 250 Kč měsíčně (dosud 1 000 Kč).",
+  "ocekavano": {
+   "odesilatel": "ČEZ",
+   "castka": "2870",
+   "splatnost": "2026-12-10",
+   "podvod": false,
+   "rada_obsahuje": [
+    "dodavatel",
+    "cen",
+    "Energetick"
+   ],
+   "rada_nesmi": []
+  }
  }
 ]

@@ -11,8 +11,8 @@ android {
         applicationId = "cz.druhynazor.test"
         minSdk = 29
         targetSdk = 34
-        versionCode = 35
-        versionName = "0.35-zkusebni"
+        versionCode = 36
+        versionName = "0.36-zkusebni"
     }
 
     signingConfigs {

@@ -109,6 +109,7 @@ object AiLetters {
         scam = strings(o, "podvod"),
         warn = strings(o, "pozor"),
         summary = o.optString("shrnuti"),
+        advice = o.optString("rada"),
         sure = o.optBoolean("jista", false),
         model = model,
     )
