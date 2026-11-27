@@ -41,7 +41,8 @@ class PolicyActivity : Activity() {
                 "•  obsah SMS a MMS (Postaráno je vaše výchozí aplikace na zprávy, zprávy zůstávají v telefonu, dokud je nesmažete),\n" +
                 "•  čísla příchozích hovorů,\n" +
                 "•  odesílatel a text oznámení z WhatsAppu a podobných aplikací,\n" +
-                "•  fotky a text dopisů (text čte nástroj Google ML Kit přímo v telefonu, fotka dopisu se smaže po 60 dnech),\n" +
+                "•  fotky dopisů (text z fotky čte nástroj Google ML Kit přímo v telefonu, fotka se smaže po 60 dnech),\n" +
+                "•  text dopisů, pokud jste nezapnuli čtení umělou inteligencí (viz bod 4),\n" +
                 "•  jména a čísla lidí z rodiny, které jste vybrali, a jejich rozhodnutí o zprávách,\n" +
                 "•  připomínky plateb.\n\n" +
                 "Tyto údaje nevidíme my ani nikdo jiný. Smažete je odinstalováním.",
@@ -54,7 +55,20 @@ class PolicyActivity : Activity() {
                 "Právní důvod: váš souhlas (čl. 6 odst. 1 písm. a) GDPR). Souhlas můžete kdykoli odvolat odinstalováním " +
                 "nebo odebráním lidí z rodiny v části Pro rodinu.",
 
-            "4. Společný seznam podvodníků" to
+            "4. Čtení dopisů umělou inteligencí" to
+                "Zapíná se jen s vaším souhlasem při prvním otevření Dopisu. Bez souhlasu se dopis čte jen v telefonu.\n" +
+                "Co: text vyfoceného dopisu, jak ho přečetl telefon. Fotka se neposílá. Rodná čísla telefon před odesláním " +
+                "nahradí slovy [rodné číslo]. Dopis může obsahovat i údaje o zdraví (třeba od pojišťovny).\n" +
+                "Komu: přes náš server u Cloudflare (Cloudflare Inc., USA), který nic neukládá, ke společnosti Anthropic " +
+                "(Anthropic PBC, USA), která text přečte umělou inteligencí Claude a vrátí shrnutí. " +
+                "Telefon pak každý údaj zkontroluje s dopisem.\n" +
+                "Proč: aby čtení dopisů bylo přesnější.\n" +
+                "Jak dlouho: u nás nikde. U společnosti Anthropic [doplníme po ověření podmínek]. " +
+                "Anthropic podle svých podmínek tyto texty nepoužívá k učení umělé inteligence [ověříme].\n" +
+                "Právní důvod: váš výslovný souhlas (čl. 6 odst. 1 písm. a) a čl. 9 odst. 2 písm. a) GDPR).\n\n" +
+                "Souhlas můžete kdykoli odvolat v části Pro rodinu, Čtení dopisů, volba Jen v telefonu.",
+
+            "5. Společný seznam podvodníků" to
                 "Co: když rodina označí zprávu jako podvod, pošle se číslo, ze kterého přišla, adresy podvodných webů " +
                 "a náhodné označení vašeho telefonu. Vaše jméno, vaše číslo ani text zprávy se neposílají. " +
                 "Čísla lidí z vaší rodiny se nikdy nehlásí.\n" +
@@ -67,36 +81,37 @@ class PolicyActivity : Activity() {
                 "Hlášení můžete vypnout v části Pro rodinu, vypínač Hlásit podvodníky do společného seznamu.\n\n" +
                 "Jednou za hodinu si telefon seznam stahuje z GitHubu. GitHub přitom vidí IP adresu telefonu.",
 
-            "5. Číslo v seznamu omylem" to
+            "6. Číslo v seznamu omylem" to
                 "Pokud se vaše číslo dostalo do seznamu podvodníků omylem, napište na [doplníme: e-mail]. " +
                 "Do 3 pracovních dnů ho vyřadíme a už se do seznamu nevrátí. " +
                 "Proti zpracování můžete podat námitku (čl. 21 GDPR).",
 
-            "6. Záloha" to
+            "7. Záloha" to
                 "Když máte v telefonu zapnutou zálohu Google, uloží se do vašeho účtu Google nastavení: kdo je v rodině " +
                 "a jak vám říkají. Shrnutí dopisů a fotky se nezálohují.",
 
-            "7. Předání mimo Evropskou unii" to
-                "ntfy.sh i GitHub sídlí v USA. U GitHubu spoléháme na rozhodnutí Evropské komise o odpovídající ochraně " +
-                "(EU–US Data Privacy Framework, čl. 45 GDPR). U ntfy.sh [doplníme po ověření]. " +
-                "Posílá se tam jen číslo podvodníka, adresa webu a náhodné označení telefonu.",
+            "8. Předání mimo Evropskou unii" to
+                "ntfy.sh, GitHub, Cloudflare i Anthropic sídlí v USA. U GitHubu a Cloudflare spoléháme na rozhodnutí Evropské komise " +
+                "o odpovídající ochraně (EU–US Data Privacy Framework, čl. 45 GDPR). U ntfy.sh a Anthropic [doplníme po ověření]. " +
+                "Do společného seznamu se posílá jen číslo podvodníka, adresa webu a náhodné označení telefonu. " +
+                "Text dopisu jen se souhlasem podle bodu 4.",
 
-            "8. Co neděláme" to
+            "9. Co neděláme" to
                 "•  Údaje neprodáváme a nepoužíváme je k reklamě.\n" +
                 "•  Nemáme uživatelské účty a nesbíráme statistiky o používání.\n" +
-                "•  Text zpráv ani dopisů neposíláme žádné umělé inteligenci. Kdyby se to změnilo, nejdřív vás požádáme o souhlas.",
+                "•  Text SMS a zpráv neposíláme žádné umělé inteligenci. Text dopisů jen tehdy, když s tím souhlasíte (bod 4).",
 
-            "9. Vaše práva" to
+            "10. Vaše práva" to
                 "Máte právo vědět, jaké údaje o vás máme, nechat je opravit nebo smazat, omezit jejich zpracování, " +
                 "vznést námitku a odvolat souhlas (čl. 15 až 21 GDPR). Stížnost můžete podat Úřadu pro ochranu osobních " +
                 "údajů, Pplk. Sochora 27, 170 00 Praha 7, www.uoou.gov.cz (čl. 77 GDPR).",
 
-            "10. Bezpečnost a odpovědnost" to
-                "Údaje v telefonu chrání Android. Spojení s ntfy.sh a GitHubem je šifrované (HTTPS).\n\n" +
+            "11. Bezpečnost a odpovědnost" to
+                "Údaje v telefonu chrání Android. Spojení s ntfy.sh, GitHubem, Cloudflare i Anthropic je šifrované (HTTPS).\n\n" +
                 "Varování je pomůcka. Nezaručí, že Postaráno pozná každý podvod, a může se splést i opačně. " +
                 "Při pochybnostech vždy zavolejte někomu z rodiny nebo přímo bance či policii.",
 
-            "11. Změny" to
+            "12. Změny" to
                 "O důležitých změnách vás předem upozorníme a požádáme o nový souhlas. Platí od [doplníme: datum].",
         )
     }

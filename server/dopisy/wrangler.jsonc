@@ -7,5 +7,6 @@
   "observability": { "enabled": true },
   // Klíč aplikace (není tajný, jen odradí náhodné návštěvníky). Klíč k Claude se zadává
   // v Cloudflare jako tajná proměnná ANTHROPIC_API_KEY, nikdy ne sem.
-  "vars": { "POSTARANO_KLIC": "postarano-dopisy-v1" }
+  // NTFY_TEMA: kanál v aplikaci ntfy, kam přijde upozornění, když dojde kredit nebo nefunguje klíč.
+  "vars": { "POSTARANO_KLIC": "postarano-dopisy-v1", "NTFY_TEMA": "postarano-kredit-82fca67bc1" }
 }

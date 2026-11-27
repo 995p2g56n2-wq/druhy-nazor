@@ -1,0 +1,25 @@
+name: Změřit čtení dopisů
+
+# Pošle 12 zkušebních dopisů na server a změří přesnost (stojí pár korun z kreditu u Anthropic).
+# Spouští se ručně, nebo když se změní zkušební dopisy.
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main, seznam]
+    paths: ["server/dopisy/zkusebni-dopisy.json", ".github/workflows/mereni.yml"]
+
+jobs:
+  mereni:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Server odpovídá
+        run: |
+          URL=$(grep -m1 '^https://' server/dopisy-adresa.txt)
+          echo "DOPISY_URL=$URL" >> "$GITHUB_ENV"
+          curl -sS --max-time 20 "$URL/"; echo
+      - name: Změřit
+        run: node server/dopisy/mereni.mjs

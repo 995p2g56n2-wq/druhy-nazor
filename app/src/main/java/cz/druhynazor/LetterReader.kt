@@ -36,6 +36,10 @@ object LetterReader {
         /** Důvody pro barvu, nejdůležitější první. */
         val reasons: List<String>,
         val textLength: Int,
+        /** Jednovětné shrnutí od umělé inteligence (neověřené, jen do Více). */
+        val aiSummary: String? = null,
+        /** Četla dopis i umělá inteligence (a která). */
+        val aiModel: String? = null,
     ) {
         val wantsMoney get() = kind in setOf(Kind.PAY, Kind.DEBT, Kind.EXEKUCE) || (kind == Kind.COURT && amount != null)
         /** Velká částka (od 10 000 Kč): i když je dopis v pořádku, ať ho radši vidí rodina. */
@@ -216,9 +220,41 @@ object LetterReader {
     private fun datesIn(s: String, today: LocalDate): List<LocalDate> =
         dateRe.findAll(s).mapNotNull { parseDate(it) }.toList() + wordDateRe.findAll(s).mapNotNull { parseWordDate(it, today) }.toList()
 
+    // ---------- Umělá inteligence ----------
+
+    /**
+     * Co vyčetla umělá inteligence (Claude). Údaje jsou opsané z dopisu. Nic z toho se nepoužije,
+     * dokud read() neověří, že to v textu dopisu opravdu je.
+     */
+    data class AiHints(
+        val sender: String = "",
+        val kind: Kind? = null,
+        val what: String = "",
+        val amountText: String = "",
+        val dueText: String = "",
+        val scam: List<String> = emptyList(),
+        val warn: List<String> = emptyList(),
+        val summary: String = "",
+        val sure: Boolean = true,
+        val model: String = "",
+    )
+
+    fun aiKind(druh: String): Kind? = when (druh) {
+        "platba" -> Kind.PAY; "upominka" -> Kind.DEBT; "exekuce" -> Kind.EXEKUCE; "soud" -> Kind.COURT
+        "preplatek" -> Kind.REFUND; "duchod" -> Kind.PENSION; "reklama" -> Kind.AD; "informace" -> Kind.INFO
+        else -> null
+    }
+
+    /** Malá písmena, jedna mezera, bez pevných mezer: na porovnání „je to v dopise doslova?“. */
+    private fun flat(s: String) = s.lowercase().replace('\u00A0', ' ').replace(Regex("\\s+"), " ").trim()
+    private fun noSpace(s: String) = s.lowercase().replace(Regex("[\\s\\u00A0]"), "")
+
+    /** Rodná čísla se umělé inteligenci neposílají. */
+    fun forAi(text: String): String = text.replace(Regex("(?<!\\d)\\d{6}\\s?/\\s?\\d{3,4}(?!\\d)"), "[rodné číslo]")
+
     // ---------- Čtení ----------
 
-    fun read(raw: String, today: LocalDate = LocalDate.now()): Letter {
+    fun read(raw: String, today: LocalDate = LocalDate.now(), ai: AiHints? = null): Letter {
         val text = raw.replace('\r', '\n')
         val lower = text.lowercase()
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
@@ -228,9 +264,9 @@ object LetterReader {
         val header = guessSender(lines)
         // Hlavička dopisu říká někoho jiného než známé jméno uvnitř textu (třeba vymahač „za ČEZ“)
         val headerConflict = k != null && header != null && !k.matches(header.lowercase())
-        val sender = if (headerConflict) header else k?.name ?: header
+        var sender = if (headerConflict) header else k?.name ?: header
 
-        val kind = when {
+        var kind = when {
             exekuceRe.containsMatchIn(text) -> Kind.EXEKUCE
             courtRe.containsMatchIn(text) -> Kind.COURT
             debtRe.containsMatchIn(text) -> Kind.DEBT
@@ -241,7 +277,7 @@ object LetterReader {
             else -> Kind.INFO
         }
 
-        val what = whatRules.firstOrNull { it.first.containsMatchIn(text) }?.second ?: k?.what
+        var what = whatRules.firstOrNull { it.first.containsMatchIn(text) }?.second ?: k?.what
 
         // Částka: nejdřív na řádku „k úhradě / celkem…“ (nebo hned pod ním, tabulky se čtou po sloupcích)
         var amount: Long? = null
@@ -262,6 +298,35 @@ object LetterReader {
             if (!dueLineRe.containsMatchIn(line)) continue
             val d = (i..minOf(i + 2, lines.lastIndex)).asSequence().mapNotNull { j -> datesIn(lines[j], today).firstOrNull() }.firstOrNull()
             if (d != null && d.isAfter(today.minusYears(1)) && d.isBefore(today.plusYears(2))) { due = d; break }
+        }
+
+        // ---------- Umělá inteligence: použít jen to, co v dopise doslova je ----------
+        val aiNotes = mutableListOf<String>()
+        if (ai != null) {
+            val flatText = flat(text)
+            val bare = noSpace(text)
+            // Odesílatel: jen když ho pravidla nenašla a v dopise je doslova napsaný
+            val aiSender = ai.sender.trim().trimEnd('.', ',').takeIf { it.length >= 3 && flat(it) in flatText }
+            if (sender == null && aiSender != null) sender = aiSender
+            // Druh: když umělá inteligence vidí platbu, kde pravidla ne, raději opatrně
+            val moneyKinds = setOf(Kind.PAY, Kind.DEBT, Kind.EXEKUCE, Kind.COURT)
+            if (ai.kind in moneyKinds && kind !in moneyKinds) kind = ai.kind!!
+            // Za co: jen když slovo (aspoň jeho začátek) v dopise je
+            if (what == null && ai.what.length >= 3 && flat(ai.what).take(5) in flatText) what = ai.what.trim()
+            // Částka: musí být v dopise doslova. Když se s pravidly neshodne, radši žádná.
+            val aiAmount = ai.amountText.takeIf { it.isNotBlank() && noSpace(it).replace(Regex("kč|kc|czk|,-$"), "").trimEnd(',', '.') in bare }
+                ?.let { t -> moneyRe.find(if (Regex("kč|kc|czk|,-", RegexOption.IGNORE_CASE).containsMatchIn(t)) t else "$t Kč")?.let { parseAmount(it) } }
+            if (aiAmount != null) {
+                if (amount == null) amount = aiAmount
+                else if (amount != aiAmount) { amount = null; aiNotes += "Částku jsem nepřečetla jistě." }
+            }
+            // Termín: musí být v dopise doslova
+            val aiDue = ai.dueText.takeIf { it.isNotBlank() && flat(it) in flatText }?.let { datesIn(it, today).firstOrNull() }
+                ?.takeIf { it.isAfter(today.minusYears(1)) && it.isBefore(today.plusYears(2)) }
+            if (aiDue != null) {
+                if (due == null) due = aiDue
+                else if (due != aiDue) { due = null; aiNotes += "Termín jsem nepřečetla jistě." }
+            }
         }
 
         val accounts = accountRe.findAll(text)
@@ -297,6 +362,13 @@ object LetterReader {
         if (kind == Kind.EXEKUCE) warn += "Exekuce je vážná věc. Ať se na dopis hned podívá rodina."
         if (kind == Kind.COURT) warn += "Dopis od soudu má krátké lhůty. Ať se na něj hned podívá rodina."
         if (k == null && (kind == Kind.PAY || kind == Kind.DEBT)) warn += "Chce peníze a odesílatele neznám."
+        if (ai != null) {
+            // Umělá inteligence může jen přidat opatrnost, nikdy ubrat
+            scam += ai.scam.map { it.trim() }.filter { it.isNotEmpty() }.take(3)
+            warn += ai.warn.map { it.trim() }.filter { it.isNotEmpty() }.take(3)
+            warn += aiNotes
+            if (!ai.sure) warn += "Umělá inteligence si dopisem nebyla jistá. Ať se na něj podívá rodina."
+        }
         // Odesílatel a to, za co chce peníze, k sobě nesedí (pojišťovna chce peníze za elektřinu)
         if (k?.what != null && (kind == Kind.PAY || kind == Kind.DEBT)) {
             val mentioned = whatRules.filter { it.first.containsMatchIn(text) }.map { group(it.second) }.toSet()
@@ -326,7 +398,8 @@ object LetterReader {
                 else -> "Nechce peníze, karty ani hesla."
             })
         }
-        return Letter(sender, k != null, kind, what, amount, due, accounts, ibans, vs, sites, phones, level, reasons, text.trim().length)
+        return Letter(sender, k != null, kind, what, amount, due, accounts, ibans, vs, sites, phones, level, reasons.distinct(), text.trim().length,
+            ai?.summary?.trim()?.takeIf { it.isNotEmpty() }, ai?.model?.takeIf { it.isNotEmpty() })
     }
 
     /** Skupina, za co se platí (elektřina, plyn i „energie“ patří k sobě). */
@@ -408,14 +481,14 @@ object LetterReader {
 
     /** Více: nejvýš 5 krátkých vět. */
     fun more(l: Letter): List<String> = listOfNotNull(
+        l.aiSummary?.let { "Stručně: ${it.trimEnd('.')}." },
         l.sender?.let { "Odesílatel: ${capital(it).trimEnd('.')}." },
         l.amount?.let { "Částka: ${money(it)}." },
         (l.accounts.firstOrNull()?.text ?: l.ibans.firstOrNull())?.let { acc ->
             "Účet: $acc" + (l.vs?.let { ", variabilní symbol $it." } ?: ".")
         } ?: l.vs?.let { "Variabilní symbol: $it." },
         l.due?.let { "Termín: ${date(it)} ${it.year}." },
-        l.reasons.first(),
-    ).take(5)
+    ).take(4) + l.reasons.first()
 
     /** SMS pro rodinu: všechno důležité na jednom místě. */
     fun familyText(l: Letter, senior: String, male: Boolean, today: LocalDate = LocalDate.now()): String {

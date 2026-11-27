@@ -158,6 +158,58 @@ Bankovní spojení: 19-2000145399/0800""")
         assertTrue(LetterReader.todo(l, today).contains("velká částka"))
     }
 
+    // ---------- Umělá inteligence: použije se jen to, co v dopise doslova je ----------
+
+    private val faktura = """Dobrá energie s.r.o.
+Vyúčtování elektřiny
+Celkem k úhradě
+1 850,00 Kč
+Datum splatnosti
+12. 12. 2026"""
+
+    @Test fun aiVymyslenyOdesilatelSeIgnoruje() {
+        val l = LetterReader.read("Upomínka. Doplaťte 900 Kč do 10.12.2026.", today,
+            LetterReader.AiHints(sender = "Zdravotní pojišťovna", amountText = "900 Kč", dueText = "10.12.2026"))
+        assertTrue(l.sender != "Zdravotní pojišťovna")
+        assertTrue(l.level != ScamCheck.Level.OK)
+    }
+
+    @Test fun aiJinaCastkaZnamenaNejistotu() {
+        val l = LetterReader.read(faktura + "\nZáloha 2 000,00 Kč", today, LetterReader.AiHints(amountText = "2 000,00 Kč"))
+        assertEquals(null, l.amount)
+        assertTrue(l.level != ScamCheck.Level.OK)
+    }
+
+    @Test fun aiStejnaCastkaPotvrdi() {
+        val l = LetterReader.read(faktura, today, LetterReader.AiHints(sender = "Dobrá energie s.r.o.", amountText = "1 850,00 Kč",
+            dueText = "12. 12. 2026", summary = "Dobrá energie chce zaplatit elektřinu.", model = "claude-haiku-5-5"))
+        assertEquals(185000L, l.amount)
+        assertEquals(ScamCheck.Level.OK, l.level)
+        assertTrue(LetterReader.more(l).first().startsWith("Stručně:"))
+    }
+
+    @Test fun aiDoplniTerminJenKdyzJeVDopise() {
+        val text = "Dobrá energie s.r.o.\nCelkem k úhradě 1 850,00 Kč\nUhraďte prosím nejdéle 12. prosince 2026."
+        val bez = LetterReader.read(text, today, LetterReader.AiHints(dueText = "15. 12. 2026"))
+        assertEquals(null, bez.due)
+        val s = LetterReader.read(text, today, LetterReader.AiHints(dueText = "12. prosince 2026"))
+        assertEquals(LocalDate.of(2026, 12, 12), s.due)
+    }
+
+    @Test fun aiPodvodZvysiOpatrnost() {
+        val l = LetterReader.read(faktura, today, LetterReader.AiHints(scam = listOf("Platí se na cizí účet.")))
+        assertEquals(ScamCheck.Level.SCAM, l.level)
+    }
+
+    @Test fun aiNejistaZnamenaPozor() {
+        val l = LetterReader.read(faktura, today, LetterReader.AiHints(sure = false))
+        assertEquals(ScamCheck.Level.WARN, l.level)
+    }
+
+    @Test fun rodneCisloSeNeposila() {
+        assertEquals("Rodné číslo: [rodné číslo], pojištěnec", LetterReader.forAi("Rodné číslo: 455612/1234, pojištěnec"))
+    }
+
     @Test fun reklama() {
         val l = show("Kaufland akční nabídka, sleva 30 % jen tento týden. Leták uvnitř.")
         assertEquals(LetterReader.Kind.AD, l.kind)
