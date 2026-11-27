@@ -40,6 +40,8 @@ object LetterReader {
         val aiSummary: String? = null,
         /** Četla dopis i umělá inteligence (a která). */
         val aiModel: String? = null,
+        /** Co s dopisem dělat podle umělé inteligence (jen když nic nechce zaplatit a nic není podezřelé). */
+        val aiAdvice: String? = null,
     ) {
         val wantsMoney get() = kind in setOf(Kind.PAY, Kind.DEBT, Kind.EXEKUCE) || (kind == Kind.COURT && amount != null)
         /** Velká částka (od 10 000 Kč): i když je dopis v pořádku, ať ho radši vidí rodina. */
@@ -235,19 +237,38 @@ object LetterReader {
         val scam: List<String> = emptyList(),
         val warn: List<String> = emptyList(),
         val summary: String = "",
+        val advice: String = "",
         val sure: Boolean = true,
         val model: String = "",
     )
 
     fun aiKind(druh: String): Kind? = when (druh) {
         "platba" -> Kind.PAY; "upominka" -> Kind.DEBT; "exekuce" -> Kind.EXEKUCE; "soud" -> Kind.COURT
-        "preplatek" -> Kind.REFUND; "duchod" -> Kind.PENSION; "reklama" -> Kind.AD; "informace" -> Kind.INFO
+        "preplatek" -> Kind.REFUND; "duchod" -> Kind.PENSION; "reklama" -> Kind.AD; "informace", "ukol" -> Kind.INFO
         else -> null
     }
 
     /** Malá písmena, jedna mezera, bez pevných mezer: na porovnání „je to v dopise doslova?“. */
     private fun flat(s: String) = s.lowercase().replace('\u00A0', ' ').replace(Regex("\\s+"), " ").trim()
     private fun noSpace(s: String) = s.lowercase().replace(Regex("[\\s\\u00A0]"), "")
+
+    private val MONEY_KINDS = setOf(Kind.PAY, Kind.DEBT, Kind.EXEKUCE)
+    /** Rada „zaplaťte“ u dopisu, který podle pravidel peníze nechce: neshoda, radu nepoužít. */
+    private val PAY_WORDS = Regex("(^|[^a-zá-ž])(zaplať|zaplatit|zaplaťte|uhraď|uhradit|uhraďte|plaťte|pošlete peníze)")
+
+    /** Nejvýš dvě věty a 220 znaků. */
+    fun shortAdvice(raw: String): String {
+        // Věta končí tečkou, za kterou je mezera a velké písmeno (ne „31. prosince“)
+        val sentences = raw.trim().split(Regex("(?<=[.!?])\\s+(?=[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ])")).map { it.trim() }.filter { it.isNotEmpty() }
+        var out = ""
+        for (sn in sentences.take(2)) {
+            val next = if (out.isEmpty()) sn else "$out $sn"
+            if (next.length > 220) break
+            out = next
+        }
+        if (out.isEmpty()) return ""
+        return if (out.last() in ".!?") out else "$out."
+    }
 
     /** Rodná čísla se umělé inteligenci neposílají. */
     fun forAi(text: String): String = text.replace(Regex("(?<!\\d)\\d{6}\\s?/\\s?\\d{3,4}(?!\\d)"), "[rodné číslo]")
@@ -398,8 +419,10 @@ object LetterReader {
                 else -> "Nechce peníze, karty ani hesla."
             })
         }
+        val advice = ai?.takeIf { it.sure && level != ScamCheck.Level.SCAM }?.advice?.let { shortAdvice(it) }
+            ?.takeIf { it.isNotEmpty() && !(kind !in MONEY_KINDS && PAY_WORDS.containsMatchIn(it.lowercase())) }
         return Letter(sender, k != null, kind, what, amount, due, accounts, ibans, vs, sites, phones, level, reasons.distinct(), text.trim().length,
-            ai?.summary?.trim()?.takeIf { it.isNotEmpty() }, ai?.model?.takeIf { it.isNotEmpty() })
+            ai?.summary?.trim()?.takeIf { it.isNotEmpty() }, ai?.model?.takeIf { it.isNotEmpty() }, advice)
     }
 
     /** Skupina, za co se platí (elektřina, plyn i „energie“ patří k sobě). */
@@ -437,6 +460,10 @@ object LetterReader {
 
     /** 1. věta: o co jde. */
     fun about(l: Letter): String {
+        // Dopis, který nechce peníze: lidsky od umělé inteligence (co přišlo a od koho)
+        if (!l.wantsMoney && l.kind != Kind.AD && l.level != ScamCheck.Level.SCAM && l.aiAdvice != null) {
+            l.aiSummary?.let { shortAdvice(it).takeIf { s -> s.isNotEmpty() } }?.let { return it }
+        }
         val who = l.sender?.let { capital(it) }
         val sum = l.amount?.let { " " + money(it) } ?: ""
         val subject = who ?: "Dopis"
@@ -463,6 +490,8 @@ object LetterReader {
     /** 3. věta: co udělat a do kdy. */
     fun todo(l: Letter, today: LocalDate = LocalDate.now()): String = when {
         l.level == ScamCheck.Level.SCAM -> "Nic neplaťte a nikam nevolejte."
+        l.kind == Kind.COURT && l.amount == null && l.aiAdvice != null ->
+            if (l.aiAdvice.contains("rodin")) l.aiAdvice else "${l.aiAdvice} Ukažte ho ještě dnes rodině."
         l.kind == Kind.EXEKUCE || l.kind == Kind.COURT -> "Nic neplaťte a ještě dnes ho ukažte rodině."
         l.level == ScamCheck.Level.WARN && l.wantsMoney -> "Zatím nic neplaťte, ať se podívá rodina."
         l.big && l.due != null -> "Vypadá to v pořádku, ale je to velká částka. Než zaplatíte do ${date(l.due)}, pošlete to ještě rodině."
@@ -470,6 +499,7 @@ object LetterReader {
         l.wantsMoney && l.due != null && l.due == today -> "Zaplaťte ještě dnes."
         l.wantsMoney && l.due != null -> "Zaplaťte do ${date(l.due)}."
         l.wantsMoney -> "Zatím neplaťte. Termín jsem nenašla, ať se podívá rodina."
+        l.aiAdvice != null && l.kind != Kind.AD -> l.aiAdvice
         l.kind == Kind.REFUND -> "Nic neplaťte, peníze vám přijdou samy."
         l.kind == Kind.AD -> "Nic nedělejte, je to jen reklama."
         else -> "Nic nedělejte, je to jen informace."
@@ -482,13 +512,14 @@ object LetterReader {
     /** Více: nejvýš 5 krátkých vět. */
     fun more(l: Letter): List<String> = listOfNotNull(
         l.aiSummary?.let { "Stručně: ${it.trimEnd('.')}." },
+        l.aiAdvice?.takeIf { l.wantsMoney }?.let { "Rada: $it" },
         l.sender?.let { "Odesílatel: ${capital(it).trimEnd('.')}." },
         l.amount?.let { "Částka: ${money(it)}." },
         (l.accounts.firstOrNull()?.text ?: l.ibans.firstOrNull())?.let { acc ->
             "Účet: $acc" + (l.vs?.let { ", variabilní symbol $it." } ?: ".")
         } ?: l.vs?.let { "Variabilní symbol: $it." },
         l.due?.let { "Termín: ${date(it)} ${it.year}." },
-    ).take(4) + l.reasons.first()
+    ).take(5) + l.reasons.first()
 
     /** SMS pro rodinu: všechno důležité na jednom místě. */
     fun familyText(l: Letter, senior: String, male: Boolean, today: LocalDate = LocalDate.now()): String {

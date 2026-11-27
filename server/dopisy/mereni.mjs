@@ -37,12 +37,16 @@ for (const rezim of rezimy) {
       castka: castka(v.castka) === o.castka,
       splatnost: datum(v.splatnost) === o.splatnost,
       podvod: o.podvod === null ? null : (v.podvod.length > 0) === o.podvod,
+      rada: o.rada_obsahuje === undefined ? null
+        : (o.rada_obsahuje.length === 0 || o.rada_obsahuje.some((k) => malymi(v.rada).includes(malymi(k))))
+          && !(o.rada_nesmi || []).some((k) => malymi(v.rada).includes(malymi(k))),
     };
     const vysledky = Object.entries(kontroly).filter(([, x]) => x !== null);
     const ok = vysledky.filter(([, x]) => x).length;
     dobre += ok; celkem += vysledky.length;
     const spatne = vysledky.filter(([, x]) => !x).map(([k]) => `${k}: „${v[k] instanceof Array ? v[k].join("; ") : v[k]}“`);
     console.log(`${spatne.length ? "✗" : "✓"} ${d.nazev}${spatne.length ? "  →  " + spatne.join(", ") : ""}`);
+    if (v.rada) console.log(`    ${v.shrnuti}  |  ${v.rada}`);
   }
   console.log(`Přesnost ${rezim}: ${dobre}/${celkem} = ${Math.round((100 * dobre) / celkem)} %`);
 }

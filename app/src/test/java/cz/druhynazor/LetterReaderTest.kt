@@ -206,6 +206,39 @@ Datum splatnosti
         assertEquals(ScamCheck.Level.WARN, l.level)
     }
 
+    private val pojistovna = "Kooperativa pojišťovna, a.s., Vienna Insurance Group\nwww.koop.cz\n" +
+        "Věc: Pojistná událost č. 7720045113\nK vyřízení potřebujeme lékařskou zprávu o ukončení léčení. Zašlete ji do 31. 12. 2026."
+
+    @Test fun aiRadiUDopisuBezPenez() {
+        val l = LetterReader.read(pojistovna, today, LetterReader.AiHints(kind = LetterReader.Kind.INFO,
+            summary = "Pojišťovna chce zprávu od lékaře.", advice = "Pošlete jim zprávu od lékaře do 31. prosince. Klidně s pomocí rodiny."))
+        assertEquals("Pojišťovna chce zprávu od lékaře.", LetterReader.about(l))
+        assertEquals("Pošlete jim zprávu od lékaře do 31. prosince. Klidně s pomocí rodiny.", LetterReader.todo(l, today))
+    }
+
+    @Test fun aiRadaZaplatitUDopisuBezPenezSeNepouzije() {
+        val l = LetterReader.read(pojistovna, today, LetterReader.AiHints(kind = LetterReader.Kind.INFO, advice = "Zaplaťte 500 Kč."))
+        assertEquals(null, l.aiAdvice)
+        assertTrue(LetterReader.todo(l, today).startsWith("Nic nedělejte"))
+    }
+
+    @Test fun aiRadaUNejistehoSeNepouzije() {
+        val l = LetterReader.read(pojistovna, today, LetterReader.AiHints(advice = "Pošlete zprávu.", sure = false))
+        assertEquals(null, l.aiAdvice)
+    }
+
+    @Test fun aiRadaUPlatbyNemeniTermin() {
+        val l = LetterReader.read(faktura, today, LetterReader.AiHints(advice = "Ať rodina porovná ceny dodavatelů."))
+        assertTrue(LetterReader.todo(l, today).startsWith("Zaplaťte do"))
+        assertTrue(LetterReader.more(l).any { it.startsWith("Rada:") })
+    }
+
+    @Test fun kratkaRada() {
+        assertEquals("Jedna. Dvě.", LetterReader.shortAdvice("Jedna. Dvě. Tři."))
+        assertEquals("Bez tečky.", LetterReader.shortAdvice("Bez tečky"))
+        assertEquals("Přijďte 14. ledna v 9 hodin. Vezměte si průkaz.", LetterReader.shortAdvice("Přijďte 14. ledna v 9 hodin. Vezměte si průkaz. A ještě."))
+    }
+
     @Test fun rodneCisloSeNeposila() {
         assertEquals("Rodné číslo: [rodné číslo], pojištěnec", LetterReader.forAi("Rodné číslo: 455612/1234, pojištěnec"))
     }
