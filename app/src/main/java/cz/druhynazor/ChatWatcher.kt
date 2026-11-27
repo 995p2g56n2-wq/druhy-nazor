@@ -47,7 +47,10 @@ class ChatWatcher : NotificationListenerService() {
         val extras = n.extras ?: return
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim() ?: ""
 
-        if (n.category == Notification.CATEGORY_CALL) {
+        if (sbn.packageName in MESSAGES_ONLY) {
+            // Aplikace Facebook hlásí i komentáře, příspěvky a narozeniny. Hlídáme jen soukromé zprávy.
+            if (!isPrivateMessage(n, extras)) return
+        } else if (n.category == Notification.CATEGORY_CALL) {
             onCall(sbn, app, title)
             return
         }
@@ -55,8 +58,8 @@ class ChatWatcher : NotificationListenerService() {
         val text = latestText(extras)
         if (text.isBlank()) return
 
-        // Stejné oznámení chodí opakovaně (aktualizace), kontrolujeme jen jednou
-        val fingerprint = (sbn.packageName + title + text).hashCode()
+        // Stejné oznámení chodí opakovaně (aktualizace) a stejná zpráva může přijít v Messengeru i ve Facebooku: kontrolujeme jen jednou
+        val fingerprint = (title + text).hashCode()
         if (!seen.add(fingerprint)) return
         if (seen.size > 200) seen.remove(seen.first())
 
@@ -143,6 +146,13 @@ class ChatWatcher : NotificationListenerService() {
             ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString() ?: ""
     }
 
+    private fun isPrivateMessage(n: Notification, extras: Bundle): Boolean {
+        if (n.category == Notification.CATEGORY_CALL) return false
+        @Suppress("DEPRECATION")
+        val messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+        return n.category == Notification.CATEGORY_MESSAGE || !messages.isNullOrEmpty()
+    }
+
     private fun looksLikeNumber(s: String): Boolean {
         val digits = s.count { it.isDigit() }
         return digits >= 6 && digits >= s.count { it.isLetter() } * 2
@@ -154,10 +164,15 @@ class ChatWatcher : NotificationListenerService() {
             "com.whatsapp.w4b" to "WhatsApp",
             "com.facebook.orca" to "Messenger",
             "com.facebook.mlite" to "Messenger",
+            "com.facebook.katana" to "Facebook",
+            "com.facebook.lite" to "Facebook",
             "org.telegram.messenger" to "Telegram",
             "com.viber.voip" to "Viber",
             "com.instagram.android" to "Instagram"
         )
+
+        /** Aplikace, ve kterých hlídáme jen soukromé zprávy (ne příspěvky, komentáře ani hovory). */
+        val MESSAGES_ONLY = setOf("com.facebook.katana", "com.facebook.lite")
 
         /** V telefonu je aspoň jeden chat, který umíme hlídat. Bez něj krok WhatsApp a Messenger odpadá. */
         fun anyChatInstalled(context: Context): Boolean = APPS.keys.any {
