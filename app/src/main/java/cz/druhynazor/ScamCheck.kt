@@ -16,7 +16,12 @@ object ScamCheck {
     data class Result(val level: Level, val reason: String, val signs: List<String>, val promo: Boolean = false)
 
     /** danger = znak, kvůli kterému zprávu nikdy nebereme jako reklamu, ať je od kohokoli. */
-    private class Rule(val regex: Regex, val weight: Int, val sign: String, val reason: String, val danger: Boolean = false)
+    /**
+     * soft = u známého nebo rodinou schváleného odesílatele (Tesco Mobile, O2…) to samo o sobě nevadí:
+     * vyúčtování zmíní bankovní účet, upozornění zmíní PIN. Vadí jen, když zpráva chce kód nebo PIN poslat či říct.
+     */
+    private class Rule(val regex: Regex, val weight: Int, val sign: String, val reason: String,
+                       val danger: Boolean = false, val soft: Boolean = false)
 
     private fun r(pattern: String) = Regex(pattern, setOf(RegexOption.IGNORE_CASE))
 
@@ -42,9 +47,9 @@ object ScamCheck {
             "Chce peníze", "Chce, abyste rychle poslali nebo převedli peníze.", danger = true),
         Rule(r("(kód z sms|kod z sms|\\bpin\\b|heslo|číslo karty|cislo karty|údaje (z |o )?kart|udaje (z |o )?kart|" +
                 "přihlašovací|prihlasovaci|ověřovací kód|overovaci kod)"), 4,
-            "Chce kód", "Chce kód, PIN nebo heslo. Banka se na ně nikdy neptá.", danger = true),
+            "Chce kód", "Chce kód, PIN nebo heslo. Banka se na ně nikdy neptá.", danger = true, soft = true),
         Rule(r("(z banky|vaše banka|vase banka|bankovní účet|bankovni ucet|policie|policist)"), 2,
-            "Banka / policie", "Vydává se za banku nebo policii.", danger = true),
+            "Banka / policie", "Vydává se za banku nebo policii.", danger = true, soft = true),
         Rule(r("(do 24 hodin|ihned|\\bhned\\b|rychle|spěch|spech|okamžitě|okamzite|naléhav|naleha|posledni vyzva|poslední výzva)"), 1,
             "Spěchá", "Tlačí vás ke spěchu, abyste nestihli přemýšlet."),
         Rule(r("(whatsapp|telegram)"), 1,
@@ -58,7 +63,7 @@ object ScamCheck {
                 "(přišel|prisel|přijde|prijde|dorazil) ti (\\p{L}+ )?(kód|kod)|(omylem|omylu).{0,40}(kód|kod|sms)|" +
                 "\\dmístný kód|\\dmistny kod|ciferný kód|ciferny kod)"), 4,
             "Kód z SMS", "Chce kód, který vám přišel v SMS. S ním vám ukradne účet nebo peníze. Nikomu ho neposílejte.",
-            danger = true),
+            danger = true, soft = true),
         Rule(r("(hlasuj|hlasoval|hlasování|hlasovani|dej\\p{L}* (mi |ji |jí |mu )?hlas|soutěž\\p{L}* (o |pro )|soutez\\p{L}* (o |pro ))"), 2,
             "Hlasování", "Prosí o hlas v soutěži. Přes takový odkaz podvodníci kradou účty na Facebooku."),
         Rule(r("((jsi|si|seš|ses) (to )?ty (na|v|ve) (tom |té |te |tý |ty |tomhle |tomto |této |teto )?(vide|fot|klip)|" +
@@ -71,7 +76,7 @@ object ScamCheck {
         Rule(r("((účet|ucet|stránk\\p{L}*|strank\\p{L}*) (bude |byl |byla )(\\p{L}+ )?(zablokov|smaz|deaktiv|zrušen|zrusen|pozastav)|" +
                 "porušen\\p{L}* (zásad|pravidel|autorsk)|poruseni (zasad|pravidel|autorsk)|meta support|facebook support|" +
                 "tým facebook|tym facebook)"), 2,
-            "Zablokování", "Straší zablokováním účtu. Facebook takové zprávy přes chat neposílá.", danger = true),
+            "Zablokování", "Straší zablokováním účtu. Facebook takové zprávy přes chat neposílá.", danger = true, soft = true),
         Rule(r("(fotk\\p{L}*|foto|vyfo\\p{L}*) (\\p{L}+ )?(občank|obcank|občansk|obcansk|pasu|karty|kartu|platební|platebni)"), 4,
             "Chce doklad", "Chce fotku dokladu nebo platební karty. To nikomu neposílejte.", danger = true),
         Rule(r("(vyhr[aá]l|výhr|bitcoin|kryptom|investic|zhodnocení)"), 3,
@@ -81,6 +86,14 @@ object ScamCheck {
     )
 
     private const val LINK_SIGN = "Odkaz"
+
+    /** Chce kód, PIN nebo heslo poslat, přepsat nebo říct („nesdělujte“ a „neříkejte“ se nepočítá). */
+    private val askSend = r("(?<!ne)(pošl|posl|přepiš|prepis|napiš|napis|sděl|sdel|nadiktuj|řekn|rekn|odešl|odesl|přečt|prect)" +
+        "\\p{L}*\\s+(\\p{L}+\\s+){0,3}(kód|kod|pin|heslo|číslo z sms|cislo z sms)|omylem|omylu")
+
+    /** Zpráva, která vám jen doručuje váš vlastní kód (přihlášení, platba kartou): „Váš ověřovací kód je 123456.“ */
+    private val codeDelivery = r("(kód|kod|heslo|pin)\\p{L}*\\s*(je|:|-)?\\s*\\d{4,8}\\b|(kód|kod|heslo)[^.!?\\n]{0,50}\\s(je|:)\\s*\\d{4,8}\\b|" +
+        "\\b\\d{4,8}\\s+(je )?(váš|vas|tvůj|tvuj)\\s+(\\p{L}+\\s+)?(kód|kod)")
 
     /**
      * Známí odesílatelé, u kterých se jméno neshoduje s adresou stránky (nebo jich mají víc).
@@ -210,20 +223,36 @@ object ScamCheck {
             hits += linkRule
         }
 
-        if (isServiceSender(sender)) {
+        // Odesílatel se jménem, nebo kdokoli, jehož zprávu rodina už jednou schválila
+        if (isServiceSender(sender) || (!sender.isNullOrBlank() && !learned.isNullOrEmpty())) {
             val key = norm(sender!!)
-            val known = knownSenders[key]
+            val known = knownSenders[key] ?: knownSenders.entries.filter { (k, _) ->
+                // „TescoMobil“, „TescoMobileCZ“, „TESCO MOB“: stačí shodný začátek jména
+                k.length >= 5 && key.length >= 6 && (key.startsWith(k) || k.startsWith(key))
+            }.maxByOrNull { it.key.length }?.value
             val official = (known?.second ?: emptySet()) + (learned ?: emptySet())
             val name = known?.first ?: sender.trim()
             val foreign = links.filterNot { siteBelongs(key, it, official) }
             val trusted = known != null || !learned.isNullOrEmpty() ||
                 (links.isNotEmpty() && foreign.isEmpty()) // jméno odesílatele sedí na stránku v odkazu
-            val danger = hits.any { it.danger }
+            val asks = askSend.containsMatchIn(text)
+            // U známého odesílatele vadí jen to, co je opravdu nebezpečné (viz Rule.soft)
+            val danger = hits.any { it.danger && !(trusted && it.soft && !asks) }
+            val delivery = links.isEmpty() && !asks && codeDelivery.containsMatchIn(text)
+            val codeReason = "Je v ní kód od $name. Nikomu ho neříkejte ani neposílejte, ani když volá banka nebo policie."
+            if (trusted && !danger && foreign.isEmpty() && delivery) {
+                return Result(Level.OK, codeReason, listOf("Kód"), promo = true)
+            }
             if (trusted && !danger && foreign.isEmpty()) {
                 val why = if (known == null && !learned.isNullOrEmpty()) "Rodina už zprávy od $name schválila."
                           else if (links.isEmpty()) "Zpráva od $name, nechce žádné kódy ani peníze."
                           else "Odkaz vede na oficiální stránku ${links.first()}."
-                return Result(Level.OK, "Reklama nebo informace od $name. $why", listOf("Reklama"), promo = true)
+                val what = if (isServiceSender(sender)) "Reklama nebo informace od $name." else "Zpráva od $name."
+                return Result(Level.OK, "$what $why", listOf(if (isServiceSender(sender)) "Reklama" else "Schváleno"), promo = true)
+            }
+            // Kód pro přihlášení nebo platbu (banka, Google…) bez odkazu: sám o sobě není podvod, jen se nesmí nikomu říct
+            if (delivery && hits.none { it.danger && !it.soft }) {
+                return Result(Level.OK, codeReason, listOf("Kód"), promo = true)
             }
             if (trusted && foreign.isNotEmpty()) {
                 // Tváří se jako známý odesílatel, ale odkaz vede jinam: typický podvod s napodobeným jménem

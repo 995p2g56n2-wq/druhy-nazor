@@ -278,7 +278,7 @@ class DruhyNazorActivity : Activity() {
         val label = when (result?.level) {
             ScamCheck.Level.SCAM -> "⚠️ PODVOD · "
             ScamCheck.Level.WARN -> "⚠️ POZOR · "
-            ScamCheck.Level.OK -> if (result.promo) "Reklama · " else ""
+            ScamCheck.Level.OK -> if (!result.promo) "" else if ("Kód" in result.signs) "Kód · " else if ("Reklama" in result.signs) "Reklama · " else ""
             null -> "Odesláno · "
         }
         col.addView(Ui.text(this, label + sms.address, 17f, bold = true,
