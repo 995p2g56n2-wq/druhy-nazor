@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -35,8 +36,6 @@
         <package android:name="org.telegram.messenger" />
         <package android:name="com.viber.voip" />
         <package android:name="com.instagram.android" />
-        <!-- Rádio: oficiální aplikace Českého rozhlasu -->
-        <package android:name="cz.rozhlas.mujrozhlas" />
     </queries>
 
     <application
@@ -97,6 +96,7 @@
         <receiver android:name=".WeatherReceiver" android:exported="false" />
         <activity android:name=".QuizActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".BenefitsActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".RadioActivity" android:exported="false" android:launchMode="singleTop" android:screenOrientation="portrait" />
         <activity
             android:name=".WeatherActivity"
             android:exported="false"
@@ -201,6 +201,11 @@
                 <action android:name="android.telecom.CallScreeningService" />
             </intent-filter>
         </service>
+
+        <service
+            android:name=".RadioService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <service
             android:name=".GuardService"

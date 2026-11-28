@@ -173,17 +173,15 @@ object FunUi {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "📻  Rádio", 22f, bold = true))
         card.addView(Ui.text(a,
-            "Dlaždice Rádio otevře aplikaci Českého rozhlasu mujRozhlas (zdarma). Tam stačí ťuknout na stanici, třeba Dvojku.",
+            "Jedno ťuknutí na dlaždici Rádio a hraje, nic se neinstaluje. Poprvé Dvojka, pak naposledy poslouchaná stanice. " +
+                "Na výběr je Dvojka, Radiožurnál, Pohoda, Vltava a Plus (Český rozhlas). Hraje i se zhasnutou obrazovkou, " +
+                "při telefonátu ztichne. Potřebuje internet, asi 60 MB za hodinu.",
             17f, color = Ui.MUTED))
         card.addView(toggle(a, Radio.ID, "Ukázat Rádio na úvodní obrazovce", onChanged))
         if (!Radio.enabled(a)) return card
-        if (Radio.installed(a)) {
-            card.addView(Ui.text(a, "✅ mujRozhlas je v telefonu.", 17f, bold = true, color = Ui.OK))
-        } else {
-            card.addView(Ui.text(a, "⚠️ mujRozhlas v telefonu není, dlaždice se ukáže až po instalaci. " +
-                "Ťukněte na Nainstalovat a v Obchodě Play na Instalovat.", 17f, color = Ui.WARN))
-            card.addView(Ui.button(a, "Nainstalovat mujRozhlas", Ui.WARN, sp = 18f) { Radio.install(a) })
-        }
+        card.addView(Ui.button(a, "Vyzkoušet Rádio", Ui.CARD, Ui.ACCENT, sp = 16f) {
+            a.startActivity(android.content.Intent(a, RadioActivity::class.java))
+        })
         return card
     }
 

@@ -98,8 +98,9 @@ class PolicyActivity : Activity() {
                 "Vypnout jde v části Pro rodinu, vypínač Zapnout Od rodiny." +
                 "\n\nPočasí: pro předpověď se posílá jen přibližné místo (zaokrouhlené asi na 1 km) nebo název obce, " +
                 "kterou zadala rodina, službě Open-Meteo. Jméno ani číslo se neposílá. Vypnout jde vypínačem Hlásit počasí.\n" +
-                "Hádanka dne, Na co mám nárok a Rádio nic nikam neposílají (Rádio jen otevře aplikaci Českého rozhlasu, " +
-                "Na co mám nárok pošle rodině SMS, jen když ťuknete na Poslat rodině).",
+                "Hádanka dne a Na co mám nárok nic nikam neposílají (Na co mám nárok pošle rodině SMS, jen když ťuknete na Poslat rodině). " +
+                "Rádio hraje přímo ze serverů Českého rozhlasu (rozhlas.stream). Ty přitom jako každý web vidí adresu vašeho připojení " +
+                "a název naší aplikace, nic jiného jim neposíláme.",
 
             "7. Číslo v seznamu omylem" to
                 "Pokud se vaše číslo dostalo do seznamu podvodníků omylem, napište na [doplníme: e-mail]. " +
