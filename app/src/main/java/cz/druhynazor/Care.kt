@@ -31,8 +31,10 @@ object Care {
 
     private const val MIN = 60_000L
 
-    /** Léky: znovu připomenout po 15 a 30 minutách, po hodině SMS rodině. */
-    val MED_STEPS = longArrayOf(0, 15 * MIN, 30 * MIN, 60 * MIN)
+    /** Léky: připomínat každých 5 minut, dokud senior nepotvrdí. Po hodině naposledy a SMS rodině. */
+    val MED_STEPS = LongArray(13) { it * 5 * MIN }
+    /** Poslední krok léků, kdy jde SMS rodině (po hodině). */
+    const val MED_SMS_STEP = 12
     /** Jsem v pořádku: zeptat se, po půl druhé hodině znovu, po třech hodinách SMS rodině. */
     val CHECK_STEPS = longArrayOf(0, 90 * MIN, 180 * MIN)
 
@@ -251,8 +253,9 @@ object Care {
                     for (s in 1 until MED_STEPS.size) set(ctx, "m|${med.id}|$s", now + MED_STEPS[s])
                 }
                 if (p.getLong("vzato_${med.id}", 0L) >= p.getLong("kdy_${med.id}", 0L)) return
-                if (step < MED_STEPS.size - 1) CareActivity.showMeds(ctx)
+                if (step != MED_SMS_STEP) CareActivity.showMeds(ctx)
                 else {
+                    CareActivity.showMeds(ctx)
                     p.edit().putLong("hlaseno_${med.id}", now).apply()
                     val prefsMain = Prefs(ctx)
                     Family.sms(ctx, "Postaráno: ${prefsMain.seniorName} zatím ${g(prefsMain, "nepotvrdila", "nepotvrdil")}, " +

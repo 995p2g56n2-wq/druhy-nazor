@@ -89,7 +89,7 @@ object Modules {
             jak = listOf(
                 "Rodina v Pro rodinu zadá lék a čas.",
                 "V ten čas telefon řekne: „Je čas na lék.“ Ťuknete na Vzala jsem.",
-                "Když neťuknete, připomene to znovu po 15 a 30 minutách. Po hodině dá vědět rodině."),
+                "Když neťuknete, připomíná to každých 5 minut. Po hodině dá vědět rodině."),
             rodina = "SMS jen tehdy, když lék do hodiny nepotvrdíte.",
             bezpeci = "Nic nedávkuje ani neradí, jen připomíná. Dávkování vždy podle lékaře."),
         Module(Care.OK, "Jsem v pořádku", "❤️",

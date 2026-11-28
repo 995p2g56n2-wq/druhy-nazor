@@ -102,7 +102,7 @@ object CareUi {
         card.addView(Ui.text(a, "💊  Léky", 22f, bold = true))
         card.addView(Ui.text(a,
             "V zadaný čas lék připomene nahlas přes celou obrazovku. Když neťukne na ${Care.takenLabel(Prefs(a))}, " +
-                "připomene to znovu po 15 a 30 minutách a po hodině vám přijde SMS.", 17f, color = Ui.MUTED))
+                "připomíná to každých 5 minut a po hodině vám přijde SMS.", 17f, color = Ui.MUTED))
         card.addView(toggle(a, Care.LEKY, "Připomínat léky", onChanged))
         if (!Care.enabled(a, Care.LEKY)) return card
 
