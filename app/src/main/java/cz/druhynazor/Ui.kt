@@ -156,6 +156,16 @@ object Ui {
         a.setContentView(KeepScroll(a).apply { setBackgroundColor(bg); isFillViewport = true; addView(root) })
     }
 
+    /** Zeptat se „Opravdu…?“ s velkými tlačítkami Ano / Ne, ať omylem ťuknutí nic nesmaže. */
+    fun confirm(a: Activity, question: String, yes: String = "Ano, odebrat", onYes: () -> Unit) {
+        val box = column(a, 20, 14)
+        box.addView(text(a, question, 24f, bold = true, center = true))
+        val d = android.app.AlertDialog.Builder(a).setView(box).create()
+        box.addView(button(a, yes, BAD, sp = 22f) { d.dismiss(); onYes() }.apply { minHeight = a.dp(80) })
+        box.addView(button(a, "Ne, nechat", OK, sp = 22f) { d.dismiss() }.apply { minHeight = a.dp(80) })
+        d.show()
+    }
+
     /** Překreslit, až se člověk přestane dotýkat displeje (aby se mu tlačítko neposunulo pod prstem). */
     fun whenIdle(a: Activity, tries: Int = 20, action: () -> Unit) {
         if (a.isFinishing) return

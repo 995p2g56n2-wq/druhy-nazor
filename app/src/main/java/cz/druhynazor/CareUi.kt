@@ -110,14 +110,18 @@ object CareUi {
         if (list.isEmpty()) card.addView(Ui.text(a, "Zatím žádný lék.", 18f, bold = true, color = Ui.MUTED))
         for (m in list) {
             val row = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL }
-            row.addView(Ui.text(a, "${m.time}   ${m.name}", 19f, bold = true),
+            val taken = Care.takenToday(a, m)
+            row.addView(Ui.text(a, (if (taken) "✅ " else "") + "${m.time}   ${m.name}" + if (taken) "\ndnes vzato" else "", 19f, bold = true,
+                color = if (taken) Ui.OK else Ui.INK),
                 LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                     gravity = android.view.Gravity.CENTER_VERTICAL
                 })
             row.addView(Ui.button(a, "Odebrat", Ui.CARD, Ui.BAD, sp = 15f) {
-                Care.removeMed(a, m.id)
-                Toast.makeText(a, "Odebráno: ${m.name} v ${m.time}", Toast.LENGTH_SHORT).show()
-                onChanged()
+                Ui.confirm(a, "Opravdu chcete odebrat ${m.name} v ${m.time}?") {
+                    Care.removeMed(a, m.id)
+                    Toast.makeText(a, "Odebráno: ${m.name} v ${m.time}", Toast.LENGTH_SHORT).show()
+                    onChanged()
+                }
             }.apply { setPadding(a.dp(12), a.dp(10), a.dp(12), a.dp(10)) })
             card.addView(row)
         }
