@@ -24,7 +24,8 @@ import java.util.Locale
 
 /**
  * Pomoc: velké červené tlačítko na úvodní obrazovce.
- * Odpočítá 5 vteřin (kdyby senior ťukl omylem, stačí Zrušit), pak pošle rodině SMS
+ * Jde otevřít i přímo z plochy (červená ikona Pomoc).
+ * Odpočítá 15 vteřin nahlas (kdyby senior zavadil omylem, stačí obrovské Zrušit), pak pošle rodině SMS
  * s polohou a zavolá prvnímu z rodiny. Po hovoru může zavolat dalším nebo záchrance.
  */
 class HelpActivity : Activity() {
@@ -37,7 +38,11 @@ class HelpActivity : Activity() {
         override fun run() {
             if (isFinishing || sent) return
             left--
-            if (left <= 0) go() else { render(); window.decorView.postDelayed(this, 1000) }
+            if (left <= 0) { go(); return }
+            render()
+            // Odpočet nahlas: deset a pak posledních pět vteřin
+            if (left == 10 || left <= 5) speaker.say(NUMBERS[left] ?: "$left")
+            window.decorView.postDelayed(this, 1000)
         }
     }
 
@@ -46,9 +51,11 @@ class HelpActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         speaker = Speaker(this)
         test = intent.getBooleanExtra(EXTRA_TEST, false)
+        // Pomoc je v Pro rodinu vypnutá: ikona z plochy nic neudělá
+        if (!test && !Care.enabled(this, Care.POMOC)) { finish(); return }
         render()
         val prefs = Prefs(this)
-        speaker.say("Za pět vteřin zavolám: ${prefs.familyFirstName}, a pošlu, kde jste. Když jste ťukli omylem, ťukněte dole na Zrušit.")
+        speaker.say("Za patnáct vteřin zavolám: ${prefs.familyFirstName}, a pošlu, kde jste. Když jste zmáčkli omylem, ťukněte na velké bílé tlačítko Zrušit.")
         window.decorView.postDelayed(tick, 1000)
     }
 
@@ -67,9 +74,13 @@ class HelpActivity : Activity() {
             root.addView(Ui.text(this, "Volám o pomoc", 36f, bold = true, center = true, color = Color.WHITE))
             root.addView(Ui.text(this, "$left", 90f, bold = true, center = true, color = Color.WHITE))
             root.addView(Ui.text(this, "Zavolám: ${prefs.familyFirstName} a pošlu, kde jste.", 24f, center = true, color = Color.WHITE))
-            root.addView(Ui.text(this, "Omyl? Ťukněte dole na Zrušit.", 22f, center = true, color = Color.WHITE))
-            root.addView(Ui.button(this, "Zrušit", Color.WHITE, Ui.INK, sp = 30f) { finish() }.apply { minHeight = dp(110) })
-            root.addView(Ui.button(this, "Zavolat hned", Ui.BAD, Color.WHITE, sp = 20f) { go() })
+            root.addView(Ui.text(this, "Omyl? Ťukněte na Zrušit.", 22f, center = true, color = Color.WHITE))
+            root.addView(Ui.button(this, "✋  ZRUŠIT", Color.WHITE, Ui.BAD, sp = 44f) { finish() }.apply { minHeight = dp(220) })
+            // Pro spěch: menší tlačítko daleko od Zrušit, aby se nedalo trefit omylem
+            root.addView(android.view.View(this), LinearLayout.LayoutParams(1, dp(60)))
+            root.addView(Ui.button(this, "Zavolat hned, nečekat", Ui.BAD, Color.WHITE, sp = 18f) { go() }.apply {
+                background = Ui.rounded(Ui.BAD, 18, this@HelpActivity, Color.WHITE)
+            })
         } else {
             root.addView(Ui.text(this, "📞", 70f, center = true))
             val line = if (prefs.familyContacts.isEmpty()) "Nikoho z rodiny nemám v seznamu."
@@ -111,7 +122,8 @@ class HelpActivity : Activity() {
 
     companion object {
         const val EXTRA_TEST = "zkouska"
-        private const val COUNTDOWN = 5
+        private const val COUNTDOWN = 15
+        private val NUMBERS = mapOf(10 to "Deset", 5 to "Pět", 4 to "Čtyři", 3 to "Tři", 2 to "Dvě", 1 to "Jedna")
     }
 }
 

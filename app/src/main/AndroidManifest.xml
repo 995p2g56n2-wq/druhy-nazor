@@ -91,6 +91,12 @@
 
         <receiver android:name=".LetterReminderReceiver" android:exported="false" />
         <receiver android:name=".CareReceiver" android:exported="false" />
+        <receiver android:name=".PomocWidget" android:exported="false" android:label="Pomoc">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_pomoc" />
+        </receiver>
         <activity
             android:name=".CareActivity"
             android:exported="false"
