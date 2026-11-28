@@ -35,8 +35,9 @@ object Care {
     val MED_STEPS = LongArray(13) { it * 5 * MIN }
     /** Poslední krok léků, kdy jde SMS rodině (po hodině). */
     const val MED_SMS_STEP = 12
-    /** Jsem v pořádku: zeptat se, po půl druhé hodině znovu, po třech hodinách SMS rodině. */
-    val CHECK_STEPS = longArrayOf(0, 90 * MIN, 180 * MIN)
+    /** Jsem v pořádku: ptát se každých 15 minut až 6 hodin, dokud senior neodpoví. Po 3 hodinách SMS rodině. */
+    val CHECK_STEPS = LongArray(24) { it * 15 * MIN }
+    const val CHECK_SMS_STEP = 12
 
     fun prefs(ctx: Context) = ctx.applicationContext.getSharedPreferences("pece", Context.MODE_PRIVATE)
 
@@ -123,7 +124,7 @@ object Care {
     fun checkTime(ctx: Context) = "%d:%02d".format(checkHour(ctx), checkMinute(ctx))
     /** Do kdy musí senior odpovědět, jinak SMS rodině. */
     fun deadlineTime(ctx: Context): String {
-        val total = checkHour(ctx) * 60 + checkMinute(ctx) + (CHECK_STEPS.last() / MIN).toInt()
+        val total = checkHour(ctx) * 60 + checkMinute(ctx) + (CHECK_STEPS[CHECK_SMS_STEP] / MIN).toInt()
         return "%d:%02d".format((total / 60) % 24, total % 60)
     }
 
@@ -275,8 +276,9 @@ object Care {
                     for (s in 1 until CHECK_STEPS.size) set(ctx, "c|$s", now + CHECK_STEPS[s])
                 }
                 if (p.getLong("odpoved_c", 0L) >= p.getLong("kdy_c", 0L)) return
-                if (step < CHECK_STEPS.size - 1) CareActivity.showCheck(ctx)
+                if (step != CHECK_SMS_STEP) CareActivity.showCheck(ctx)
                 else {
+                    CareActivity.showCheck(ctx)
                     p.edit().putLong("hlaseno_c", now).apply()
                     val prefsMain = Prefs(ctx)
                     Family.sms(ctx, "Postaráno: ${prefsMain.seniorName} dnes do ${deadlineTime(ctx)} ${g(prefsMain, "neodpověděla", "neodpověděl")} " +

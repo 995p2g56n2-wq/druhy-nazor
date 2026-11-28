@@ -77,7 +77,7 @@ object CareUi {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "❤️  Jsem v pořádku", 22f, bold = true))
         card.addView(Ui.text(a,
-            "Každý den v ${Care.checkTime(a)} se zeptá „Jak se máte?“. Když neodpoví, zeptá se znovu, " +
+            "Každý den v ${Care.checkTime(a)} se zeptá „Jak se máte?“. Když neodpoví, ptá se každých 15 minut, " +
                 "a když neodpoví do ${Care.deadlineTime(a)}, přijde vám SMS. Při odpovědi Není mi dobře vám přijde SMS hned.",
             17f, color = Ui.MUTED))
         card.addView(toggle(a, Care.OK, "Ptát se každý den", onChanged))
