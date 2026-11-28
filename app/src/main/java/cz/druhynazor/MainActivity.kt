@@ -290,7 +290,7 @@ class MainActivity : Activity() {
 
     /** Co je vidět na úvodní obrazovce: když se nic nezměnilo, není co překreslovat. */
     private var shownKey = ""
-    private fun homeKey() = "${DnSetupActivity.allDone(this)}|${FamilyMail.unseen(this)}|${Quiz.doneToday(this)}|${Radio.installed(this)}"
+    private fun homeKey() = "${DnSetupActivity.allDone(this)}|${FamilyMail.unseen(this)}|${Quiz.doneToday(this)}|${Radio.playing}"
 
     private fun home(root: LinearLayout) {
         shownKey = homeKey()
@@ -342,7 +342,7 @@ class MainActivity : Activity() {
         if (Weather.enabled(this)) tiles += Tile("☀️\nPočasí") {
             startActivity(Intent(this, WeatherActivity::class.java))
         }
-        if (Radio.enabled(this) && Radio.installed(this)) tiles += Tile("📻\nRádio") { Radio.open(this) }
+        if (Radio.enabled(this)) tiles += Tile(if (Radio.playing) "📻\nRádio hraje" else "📻\nRádio") { Radio.open(this) }
         if (Care.enabled(this, BENEFITS)) tiles += Tile("💰\nNa co mám nárok") {
             startActivity(Intent(this, BenefitsActivity::class.java))
         }

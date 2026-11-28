@@ -119,6 +119,14 @@ object Ui {
         /** Prst je na displeji nebo byl před chvílí (obrazovka ještě dojíždí). */
         val busy: Boolean get() = touching || SystemClock.uptimeMillis() - lastTouch < 1500
 
+        init {
+            // Po překreslení si Android sám vybere nějaké textové pole (třeba Obec u Počasí) a odroluje k němu.
+            // Proto má výchozí zaměření samotný posuvník, pole dostane zaměření až ťuknutím.
+            descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
+            isFocusable = true
+            isFocusableInTouchMode = true
+        }
+
         override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
             lastTouch = SystemClock.uptimeMillis()
             when (ev.actionMasked) {
@@ -140,6 +148,8 @@ object Ui {
             old.removeAllViews()
             old.setBackgroundColor(bg)
             old.addView(root)
+            old.requestFocus()
+            old.scrollTo(0, y)
             old.post { old.scrollTo(0, y) }
             return
         }
