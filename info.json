@@ -1,0 +1,51 @@
+{
+ "verze": "8fd37e1c8e10",
+ "aktualizovano": "2026-11-28T13:52:19+00:00",
+ "cisla": 0,
+ "weby_komunita": 0,
+ "coi": 1377,
+ "phish": 386066,
+ "phish_verze": "2026-11-28",
+ "phish_prefixu": 386066,
+ "phish_retez": [
+  {
+   "den": "2026-11-23",
+   "z": "2026-11-22",
+   "plus": 0,
+   "minus": 0
+  },
+  {
+   "den": "2026-11-24",
+   "z": "2026-11-23",
+   "plus": 0,
+   "minus": 0
+  },
+  {
+   "den": "2026-11-25",
+   "z": "2026-11-24",
+   "plus": 0,
+   "minus": 0
+  },
+  {
+   "den": "2026-11-26",
+   "z": "2026-11-25",
+   "plus": 0,
+   "minus": 0
+  },
+  {
+   "den": "2026-11-27",
+   "z": "2026-11-26",
+   "plus": 0,
+   "minus": 0
+  },
+  {
+   "den": "2026-11-28",
+   "z": "2026-11-27",
+   "plus": 0,
+   "minus": 0
+  }
+ ],
+ "nova_hlaseni": 0,
+ "cekajici": 0,
+ "dopisy_server": "https://postarano-dopisy.fg95f6rkp6.workers.dev"
+}
