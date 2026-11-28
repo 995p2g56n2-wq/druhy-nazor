@@ -45,7 +45,7 @@ class FamilyMailActivity : Activity() {
         if (currentId == null) album = true
         render(speak = true)
         // Když je otevřené, podívat se rovnou na server, jestli něco nepřibylo
-        FamilyMail.checkNow(this) { n -> if (n > 0 && !isFinishing && album) render(speak = false) }
+        FamilyMail.checkNow(this) { n -> if (n > 0 && album) Ui.whenIdle(this) { if (album) render(speak = false, keep = true) } }
     }
 
     override fun onPause() {
@@ -68,11 +68,11 @@ class FamilyMailActivity : Activity() {
 
     private fun stopPlayer() { player?.release(); player = null }
 
-    private fun render(speak: Boolean) {
+    private fun render(speak: Boolean, keep: Boolean = false) {
         val root = Ui.column(this, 20, 16).apply { setBackgroundColor(Ui.BG) }
         val item = if (album) null else FamilyMail.items(this).firstOrNull { it.id == currentId }
         if (item == null) albumScreen(root, speak) else itemScreen(root, item, speak)
-        setContentView(ScrollView(this).apply { setBackgroundColor(Ui.BG); isFillViewport = true; addView(root) })
+        Ui.show(this, root, keep = keep)
     }
 
     // ---------- Jedna věc ----------
