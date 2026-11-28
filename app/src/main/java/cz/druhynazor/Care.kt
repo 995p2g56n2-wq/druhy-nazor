@@ -88,6 +88,12 @@ object Care {
         }
     }
 
+    /** Lék byl dnes potvrzený. */
+    fun takenToday(ctx: Context, m: Med): Boolean {
+        val t = prefs(ctx).getLong("vzato_${m.id}", 0L)
+        return t > 0 && sameDay(t, System.currentTimeMillis())
+    }
+
     /** Senior ťukl na Vzala jsem. Když už rodina dostala SMS, že lék nepotvrdil(a), dostane i tuhle. */
     fun markTaken(ctx: Context, list: List<Med>) {
         val p = prefs(ctx)
@@ -135,7 +141,8 @@ object Care {
     /** Senior odpověděl. good = Dobře, jinak Není mi dobře. */
     fun answerCheck(ctx: Context, good: Boolean) {
         val p = prefs(ctx)
-        val late = p.getLong("hlaseno_c", 0L) >= p.getLong("kdy_c", Long.MAX_VALUE)
+        // Rodina už dostala SMS, že neodpovídá (a jde o dnešní otázku): dát vědět, že se ozval(a)
+        val late = checkPending(ctx) && p.getLong("hlaseno_c", 0L) >= p.getLong("kdy_c", Long.MAX_VALUE)
         p.edit().putLong("odpoved_c", System.currentTimeMillis()).apply()
         for (step in 1 until CHECK_STEPS.size) clear(ctx, "c|$step")
         val prefsMain = Prefs(ctx)
@@ -145,6 +152,11 @@ object Care {
         } else if (late) {
             Family.sms(ctx, "Postaráno: ${prefsMain.seniorName} se už ${g(prefsMain, "ozvala", "ozval")}: je v pořádku. Nemusíte nic dělat.")
         }
+    }
+
+    private fun sameDay(a: Long, b: Long): Boolean {
+        val z = ZoneId.systemDefault()
+        return Instant.ofEpochMilli(a).atZone(z).toLocalDate() == Instant.ofEpochMilli(b).atZone(z).toLocalDate()
     }
 
     // ---------- Oslovení podle toho, jak seniorovi říkají ----------
@@ -253,6 +265,9 @@ object Care {
                 val step = parts[1].toIntOrNull() ?: return
                 if (step == 0) {
                     set(ctx, "c|0", nextAt(now + MIN, checkHour(ctx), checkMinute(ctx)))
+                    // Senior už dnes odpověděl sám (dlaždice na úvodní obrazovce): neptat se znovu
+                    val answered = p.getLong("odpoved_c", 0L)
+                    if (answered > 0 && sameDay(answered, now)) return
                     p.edit().putLong("kdy_c", now).apply()
                     for (s in 1 until CHECK_STEPS.size) set(ctx, "c|$s", now + CHECK_STEPS[s])
                 }

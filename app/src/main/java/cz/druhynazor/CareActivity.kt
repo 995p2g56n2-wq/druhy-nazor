@@ -26,6 +26,7 @@ class CareActivity : Activity() {
     private var mode = MODE_MEDS
     private var test = false
     private var testMed: String? = null
+    private var tile = false
     private val repeat = Runnable { lastSaid?.let { if (!isFinishing) speaker.say(it) } }
     private var lastSaid: String? = null
 
@@ -45,8 +46,13 @@ class CareActivity : Activity() {
         mode = i.getStringExtra(EXTRA_MODE) ?: MODE_MEDS
         test = i.getBooleanExtra(EXTRA_TEST, false)
         testMed = i.getStringExtra(EXTRA_TEST_MED)
+        tile = i.getBooleanExtra(EXTRA_TILE, false)
         getSystemService(NotificationManager::class.java)?.cancel(if (mode == MODE_MEDS) NOTIF_MEDS else NOTIF_CHECK)
-        if (mode == MODE_MEDS) meds() else check()
+        when (mode) {
+            MODE_MEDS -> meds()
+            MODE_OVERVIEW -> if (Care.dueMeds(this).isNotEmpty()) meds() else overview()
+            else -> check()
+        }
     }
 
     override fun onPause() {
@@ -103,7 +109,7 @@ class CareActivity : Activity() {
     // ---------- Jsem v pořádku ----------
 
     private fun check() {
-        if (!test && !Care.checkPending(this)) { finish(); return }
+        if (!test && !tile && !Care.checkPending(this)) { finish(); return }
         val hello = if (LocalTime.now().hour < 11) "Dobré ráno" else "Dobrý den"
         val root = Ui.column(this, 24, 22)
         spacer(root, 24)
@@ -121,6 +127,37 @@ class CareActivity : Activity() {
         })
         show(root, Ui.BG)
         say("$hello, jak se máte? Ťukněte dole na Dobře, nebo na Není mi dobře.")
+    }
+
+    /** Dlaždice Léky: co se dnes bere a kdy. Senior tu nic nenastavuje. */
+    private fun overview() {
+        val prefs = Prefs(this)
+        val meds = Care.meds(this)
+        val root = Ui.column(this, 24, 18)
+        spacer(root, 16)
+        root.addView(Ui.text(this, "💊", 80f, center = true))
+        root.addView(Ui.text(this, "Vaše léky", 34f, bold = true, center = true))
+        val say: String
+        if (meds.isEmpty()) {
+            say = "Zatím tu žádný lék není. Zadá ho ${prefs.familyFirstName}. Teď ťukněte dole na Zpět."
+            root.addView(Ui.text(this, "Zatím tu žádný lék není. Zadá ho ${prefs.familyFirstName}.", 24f, center = true))
+        } else {
+            for (m in meds) {
+                val taken = Care.takenToday(this, m)
+                val card = Ui.card(this, 4).apply {
+                    background = Ui.rounded(if (taken) Ui.OK_SOFT else Ui.CARD, 20, this@CareActivity)
+                }
+                card.addView(Ui.text(this, "${m.time}   ${m.name}", 26f, bold = true))
+                card.addView(Ui.text(this, if (taken) "✅ Dnes vzato" else "⏰ Připomenu v ${m.time}", 21f,
+                    color = if (taken) Ui.OK else Ui.MUTED))
+                root.addView(card)
+            }
+            say = "Tady jsou vaše léky. Až bude čas, připomenu vám je sama. Teď ťukněte dole na Zpět."
+        }
+        spacer(root, 12)
+        root.addView(big("Zpět", Ui.ACCENT) { finish() })
+        show(root, Ui.BG)
+        say(say, again = false)
     }
 
     private fun notWell() {
@@ -164,6 +201,9 @@ class CareActivity : Activity() {
         const val EXTRA_TEST_MED = "zkusebni_lek"
         const val MODE_MEDS = "leky"
         const val MODE_CHECK = "jak_se_mate"
+        const val MODE_OVERVIEW = "prehled_leku"
+        /** Otevřeno ťuknutím na dlaždici na úvodní obrazovce (ne budíkem). */
+        const val EXTRA_TILE = "dlazdice"
         private const val NOTIF_MEDS = 8100
         private const val NOTIF_CHECK = 8101
 
