@@ -1,6 +1,11 @@
 package cz.druhynazor
 
+import android.app.Activity
 import android.content.Context
+import android.os.SystemClock
+import android.view.MotionEvent
+import android.view.ViewGroup
+import android.widget.ScrollView
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -101,5 +106,51 @@ object Ui {
     fun matchWidth(v: View): View {
         v.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         return v
+    }
+
+    /**
+     * Obrazovka, která si při překreslení pamatuje, kam byla posunutá, a pozná, že se jí zrovna někdo dotýká.
+     * Dřív se při každém překreslení (třeba 3 vteřiny po otevření) celá obrazovka vrátila nahoru
+     * a ťuknutí pak trefilo jiné tlačítko.
+     */
+    class KeepScroll(ctx: Context) : ScrollView(ctx) {
+        private var touching = false
+        private var lastTouch = 0L
+        /** Prst je na displeji nebo byl před chvílí (obrazovka ještě dojíždí). */
+        val busy: Boolean get() = touching || SystemClock.uptimeMillis() - lastTouch < 1500
+
+        override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+            lastTouch = SystemClock.uptimeMillis()
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> touching = true
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> touching = false
+            }
+            return super.dispatchTouchEvent(ev)
+        }
+    }
+
+    private fun current(a: Activity): KeepScroll? =
+        a.findViewById<ViewGroup>(android.R.id.content)?.getChildAt(0) as? KeepScroll
+
+    /** Ukázat obsah. keep = stejná obrazovka, jen obnovená: zůstat na stejném místě. */
+    fun show(a: Activity, root: View, bg: Int = BG, keep: Boolean = true) {
+        val old = if (keep) current(a) else null
+        if (old != null) {
+            val y = old.scrollY
+            old.removeAllViews()
+            old.setBackgroundColor(bg)
+            old.addView(root)
+            old.post { old.scrollTo(0, y) }
+            return
+        }
+        a.setContentView(KeepScroll(a).apply { setBackgroundColor(bg); isFillViewport = true; addView(root) })
+    }
+
+    /** Překreslit, až se člověk přestane dotýkat displeje (aby se mu tlačítko neposunulo pod prstem). */
+    fun whenIdle(a: Activity, tries: Int = 20, action: () -> Unit) {
+        if (a.isFinishing) return
+        val v = current(a)
+        if (v != null && v.busy && tries > 0) { v.postDelayed({ whenIdle(a, tries - 1, action) }, 700); return }
+        action()
     }
 }

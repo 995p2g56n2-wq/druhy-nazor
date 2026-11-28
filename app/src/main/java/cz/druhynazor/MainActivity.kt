@@ -65,11 +65,15 @@ class MainActivity : Activity() {
         // Od rodiny: pravidelná kontrola, a hned teď se podívat, jestli něco nepřišlo
         FamilyMail.schedule(this)
         Weather.schedule(this)
-        if (screen == Screen.HOME) FamilyMail.checkNow(this) { n -> if (n > 0 && !isFinishing && screen == Screen.HOME) render() }
+        if (screen == Screen.HOME) FamilyMail.checkNow(this) { n -> if (n > 0 && screen == Screen.HOME) Ui.whenIdle(this) { render() } }
         // Hlídání po spuštění chvíli nabíhá (třeba po aktualizaci), stav pak zkontrolovat znovu.
         // Teprve potom případně dát vědět rodině, že ochrana není celá zapnutá.
         window.decorView.postDelayed({
-            if (screen == Screen.HOME && !isFinishing) { render(); alertFamilyIfNeeded(); announceLetters(); Care.announce(this) }
+            if (screen == Screen.HOME && !isFinishing) {
+                // Překreslit jen, když se stav opravdu změnil, a ne pod prstem
+                if (homeKey() != shownKey) Ui.whenIdle(this) { if (screen == Screen.HOME) render() }
+                alertFamilyIfNeeded(); announceLetters(); Care.announce(this)
+            }
         }, 3000)
     }
 
@@ -111,8 +115,12 @@ class MainActivity : Activity() {
             Screen.DONE -> done(root)
             Screen.HOME -> home(root)
         }
-        setContentView(ScrollView(this).apply { setBackgroundColor(Ui.BG); isFillViewport = true; addView(root) })
+        // Stejná obrazovka jen obnovená: zůstat na místě, kam senior posunul
+        Ui.show(this, root, keep = screen == shownScreen)
+        shownScreen = screen
     }
+
+    private var shownScreen: Screen? = null
 
     private fun spacer(root: LinearLayout, dpH: Int = 24) =
         root.addView(View(this), LinearLayout.LayoutParams(1, dp(dpH)))
@@ -280,7 +288,12 @@ class MainActivity : Activity() {
 
     // ---------- Úvodní obrazovka seniora ----------
 
+    /** Co je vidět na úvodní obrazovce: když se nic nezměnilo, není co překreslovat. */
+    private var shownKey = ""
+    private fun homeKey() = "${DnSetupActivity.allDone(this)}|${FamilyMail.unseen(this)}|${Quiz.doneToday(this)}|${Radio.installed(this)}"
+
     private fun home(root: LinearLayout) {
+        shownKey = homeKey()
         val prefs = Prefs(this)
         val ok = DnSetupActivity.allDone(this)
         val family = prefs.familyContacts
