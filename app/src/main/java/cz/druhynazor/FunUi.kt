@@ -19,17 +19,12 @@ object FunUi {
         into.addView(benefits(a, onChanged))
     }
 
-    private fun toggle(a: Activity, id: String, label: String, onChanged: () -> Unit) = CheckBox(a).apply {
-        text = label
-        textSize = 18f
-        setTextColor(Ui.INK)
-        isChecked = Care.enabled(a, id)
-        setOnCheckedChangeListener { _, on ->
-            Care.setEnabled(a, id, on)
-            if (id == FamilyMail.ID) { FamilyMail.schedule(a); if (on) FamilyMail.checkNow(a) }
-            if (id == Weather.ID) Weather.schedule(a)
-            onChanged()
-        }
+    private fun toggle(a: Activity, id: String, label: String, onChanged: () -> Unit) = Ui.onOff(a, label, Care.enabled(a, id)) { on ->
+        Care.setEnabled(a, id, on)
+        if (id == FamilyMail.ID) { FamilyMail.schedule(a); if (on) FamilyMail.checkNow(a) }
+        if (id == Weather.ID) Weather.schedule(a)
+        if (id == Radio.ID && !on) Radio.stop(a)
+        onChanged()
     }
 
     // ---------- Od rodiny ----------
@@ -38,12 +33,12 @@ object FunUi {
         val prefs = Prefs(a)
         val card = Ui.card(a)
         card.addView(Ui.text(a, "📷  Od rodiny", 22f, bold = true))
+        card.addView(toggle(a, FamilyMail.ID, "Zapnout Od rodiny", onChanged))
         card.addView(Ui.text(a,
             "Pošlete ${prefs.seniorGenitive.let { if (it == "vašeho blízkého") "svému blízkému" else "na telefon $it" }} fotku, krátké video, " +
                 "hlasový nebo psaný vzkaz. Ukáže se přes celou obrazovku a přečte se nahlas. Odpovědět může srdíčkem nebo vám zavolá. " +
                 "Každý z rodiny má vlastní odkaz, přijde mu jednou v SMS. Telefon se dívá na novinky každých 15 minut, potřebuje internet.",
             17f, color = Ui.MUTED))
-        card.addView(toggle(a, FamilyMail.ID, "Zapnout Od rodiny", onChanged))
         if (!FamilyMail.enabled(a)) return card
         if (prefs.familyContacts.isEmpty()) {
             card.addView(Ui.text(a, "Nejdřív přidejte někoho z rodiny (výše).", 17f, color = Ui.WARN))
@@ -89,10 +84,10 @@ object FunUi {
     private fun quiz(a: Activity, onChanged: () -> Unit): View {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "🧩  Hádanka dne", 22f, bold = true))
+        card.addView(toggle(a, Quiz.ID, "Ukázat Hádanku na úvodní obrazovce", onChanged))
         card.addView(Ui.text(a,
             "Každý den 3 otázky pro radost: přísloví, hádanky, Česko, počítání. Nikdy neřekne „špatně“, jen „Skoro, správně je…“. " +
                 "Na konci si může zahrát pexeso. Funguje i bez internetu.", 17f, color = Ui.MUTED))
-        card.addView(toggle(a, Quiz.ID, "Ukázat Hádanku na úvodní obrazovce", onChanged))
         if (!Quiz.enabled(a)) return card
         val last = Quiz.lastPlayed(a)
         card.addView(Ui.text(a, when {
@@ -113,10 +108,10 @@ object FunUi {
     private fun weather(a: Activity, onChanged: () -> Unit): View {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "☀️  Počasí a výstrahy", 22f, bold = true))
+        card.addView(toggle(a, Weather.ID, "Hlásit počasí", onChanged))
         card.addView(Ui.text(a,
             "Ráno v 8:00 se podívá na předpověď. Když hrozí vedro (od 31 °C), náledí, mráz, silný vítr nebo bouřky, " +
                 "řekne nahlas jednou větou, co dělat. Dlaždice Počasí řekne předpověď na dnes a zítra kdykoli.", 17f, color = Ui.MUTED))
-        card.addView(toggle(a, Weather.ID, "Hlásit počasí", onChanged))
         if (!Weather.enabled(a)) return card
 
         val name = Weather.placeName(a)
@@ -172,12 +167,12 @@ object FunUi {
     private fun radio(a: Activity, onChanged: () -> Unit): View {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "📻  Rádio", 22f, bold = true))
+        card.addView(toggle(a, Radio.ID, "Ukázat Rádio na úvodní obrazovce", onChanged))
         card.addView(Ui.text(a,
             "Jedno ťuknutí na dlaždici Rádio a hraje, nic se neinstaluje. Poprvé Dvojka, pak naposledy poslouchaná stanice. " +
                 "Na výběr je Dvojka, Radiožurnál, Pohoda, Vltava a Plus (Český rozhlas). Hraje i se zhasnutou obrazovkou, " +
                 "při telefonátu ztichne. Potřebuje internet, asi 60 MB za hodinu.",
             17f, color = Ui.MUTED))
-        card.addView(toggle(a, Radio.ID, "Ukázat Rádio na úvodní obrazovce", onChanged))
         if (!Radio.enabled(a)) return card
         card.addView(Ui.button(a, "Vyzkoušet Rádio", Ui.CARD, Ui.ACCENT, sp = 16f) {
             a.startActivity(android.content.Intent(a, RadioActivity::class.java))
@@ -190,11 +185,11 @@ object FunUi {
     private fun benefits(a: Activity, onChanged: () -> Unit): View {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "💰  Na co mám nárok", 22f, bold = true))
+        card.addView(toggle(a, MainActivity.BENEFITS, "Ukázat na úvodní obrazovce", onChanged))
         card.addView(Ui.text(a,
             "Pár otázek ano / ne o bydlení a o pomoci druhého člověka. Pak řekne „možná máte nárok“ na superdávku " +
                 "nebo příspěvek na péči a pošle vám SMS s odkazem na kalkulačku MPSV. Je to jen nápověda, rozhoduje Úřad práce.",
             17f, color = Ui.MUTED))
-        card.addView(toggle(a, MainActivity.BENEFITS, "Ukázat na úvodní obrazovce", onChanged))
         if (!Care.enabled(a, MainActivity.BENEFITS)) return card
         card.addView(Ui.button(a, "Vyzkoušet", Ui.CARD, Ui.ACCENT, sp = 16f) {
             a.startActivity(Intent(a, BenefitsActivity::class.java))

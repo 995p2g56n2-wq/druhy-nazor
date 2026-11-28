@@ -21,23 +21,17 @@ object CareUi {
         into.addView(meds(a, onChanged))
     }
 
-    private fun toggle(a: Activity, id: String, label: String, onChanged: () -> Unit) = CheckBox(a).apply {
-        text = label
-        textSize = 18f
-        setTextColor(Ui.INK)
-        isChecked = Care.enabled(a, id)
-        setOnCheckedChangeListener { _, on -> Care.setEnabled(a, id, on); onChanged() }
-    }
+    private fun toggle(a: Activity, id: String, label: String, onChanged: () -> Unit) = Ui.onOff(a, label, Care.enabled(a, id)) { on -> Care.setEnabled(a, id, on); onChanged() }
 
     // ---------- Pomoc ----------
 
     private fun help(a: Activity, onChanged: () -> Unit): View {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "🆘  Pomoc", 22f, bold = true))
+        card.addView(toggle(a, Care.POMOC, "Ukázat tlačítko Pomoc", onChanged))
         card.addView(Ui.text(a,
             "Velké červené tlačítko na úvodní obrazovce. Po 15 vteřinách pošle rodině SMS s polohou a zavolá prvnímu v seznamu. " +
                 "Do té doby jde zrušit obrovským tlačítkem Zrušit.", 17f, color = Ui.MUTED))
-        card.addView(toggle(a, Care.POMOC, "Ukázat tlačítko Pomoc", onChanged))
         if (!Care.enabled(a, Care.POMOC)) return card
         val loc = Help.locationAllowed(a)
         val call = Help.callAllowed(a)
@@ -76,12 +70,21 @@ object CareUi {
     private fun check(a: Activity, onChanged: () -> Unit): View {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "❤️  Jsem v pořádku", 22f, bold = true))
+        card.addView(toggle(a, Care.OK, "Ptát se „Jak se máte?“", onChanged))
         card.addView(Ui.text(a,
-            "Každý den v ${Care.checkTime(a)} se zeptá „Jak se máte?“. Když neodpoví, ptá se každých 15 minut, " +
+            "${Care.everyLabel(Care.checkEvery(a)).replaceFirstChar { it.uppercase() }} v ${Care.checkTime(a)} se zeptá „Jak se máte?“. Když neodpoví, ptá se každých 15 minut, " +
                 "a když neodpoví do ${Care.deadlineTime(a)}, přijde vám SMS. Při odpovědi Není mi dobře vám přijde SMS hned.",
             17f, color = Ui.MUTED))
-        card.addView(toggle(a, Care.OK, "Ptát se každý den", onChanged))
         if (!Care.enabled(a, Care.OK)) return card
+        card.addView(Ui.text(a, "Jak často se ptát:", 18f, bold = true))
+        val now = Care.checkEvery(a)
+        for (d in Care.CHECK_EVERY) {
+            val on = d == now
+            card.addView(Ui.button(a, (if (on) "✓  " else "") + Care.everyLabel(d).replaceFirstChar { it.uppercase() },
+                if (on) Ui.OK else Ui.CARD, if (on) android.graphics.Color.WHITE else Ui.ACCENT, sp = 18f) {
+                Care.setCheckEvery(a, d); onChanged()
+            })
+        }
         card.addView(Ui.button(a, "🕘  Změnit čas (teď ${Care.checkTime(a)})", Ui.CARD, Ui.ACCENT, sp = 17f) {
             TimePickerDialog(a, { _, h, m -> Care.setCheckTime(a, h, m); onChanged() },
                 Care.checkHour(a), Care.checkMinute(a), true).show()
@@ -100,24 +103,28 @@ object CareUi {
     private fun meds(a: Activity, onChanged: () -> Unit): View {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "💊  Léky", 22f, bold = true))
+        card.addView(toggle(a, Care.LEKY, "Připomínat léky", onChanged))
         card.addView(Ui.text(a,
             "V zadaný čas lék připomene nahlas přes celou obrazovku. Když neťukne na ${Care.takenLabel(Prefs(a))}, " +
                 "připomíná to každých 5 minut a po hodině vám přijde SMS.", 17f, color = Ui.MUTED))
-        card.addView(toggle(a, Care.LEKY, "Připomínat léky", onChanged))
         if (!Care.enabled(a, Care.LEKY)) return card
 
         val list = Care.meds(a)
         if (list.isEmpty()) card.addView(Ui.text(a, "Zatím žádný lék.", 18f, bold = true, color = Ui.MUTED))
         for (m in list) {
             val row = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL }
-            row.addView(Ui.text(a, "${m.time}   ${m.name}", 19f, bold = true),
+            val taken = Care.takenToday(a, m)
+            row.addView(Ui.text(a, (if (taken) "✅ " else "") + "${m.time}   ${m.name}" + if (taken) "\ndnes vzato" else "", 19f, bold = true,
+                color = if (taken) Ui.OK else Ui.INK),
                 LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                     gravity = android.view.Gravity.CENTER_VERTICAL
                 })
             row.addView(Ui.button(a, "Odebrat", Ui.CARD, Ui.BAD, sp = 15f) {
-                Care.removeMed(a, m.id)
-                Toast.makeText(a, "Odebráno: ${m.name} v ${m.time}", Toast.LENGTH_SHORT).show()
-                onChanged()
+                Ui.confirm(a, "Opravdu chcete odebrat ${m.name} v ${m.time}?") {
+                    Care.removeMed(a, m.id)
+                    Toast.makeText(a, "Odebráno: ${m.name} v ${m.time}", Toast.LENGTH_SHORT).show()
+                    onChanged()
+                }
             }.apply { setPadding(a.dp(12), a.dp(10), a.dp(12), a.dp(10)) })
             card.addView(row)
         }

@@ -73,7 +73,7 @@ object FamilyUi {
                 LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                     gravity = android.view.Gravity.CENTER_VERTICAL
                 })
-            row.addView(Ui.button(a, "Odebrat", Ui.CARD, Ui.BAD, sp = 15f) {
+            row.addView(Ui.button(a, "Odebrat", Ui.CARD, Ui.BAD, sp = 15f) { Ui.confirm(a, "Opravdu chcete odebrat ${c.name}? Už nebude dostávat zprávy.") {
                 prefs.familyContacts = prefs.familyContacts.filter { it != c }
                 lastRemoved = c
                 if (canSms(a)) {
@@ -81,7 +81,7 @@ object FamilyUi {
                     Family.sms(a, "Postaráno: ${c.name} už nedostává zprávy o telefonu ${prefs.seniorGenitive}.")
                 }
                 onChanged()
-            }.apply { setPadding(a.dp(12), a.dp(10), a.dp(12), a.dp(10)) })
+            } }.apply { setPadding(a.dp(12), a.dp(10), a.dp(12), a.dp(10)) })
             card.addView(row)
         }
 

@@ -156,6 +156,39 @@ object Ui {
         a.setContentView(KeepScroll(a).apply { setBackgroundColor(bg); isFillViewport = true; addView(root) })
     }
 
+    /**
+     * Velký posuvník Zapnuto / Vypnuto na začátku každého pomocníka. Vypnuto = dlaždice zmizí z úvodní obrazovky.
+     */
+    fun onOff(a: Activity, label: String, on: Boolean, change: (Boolean) -> Unit): View {
+        val row = LinearLayout(a).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = rounded(if (on) OK_SOFT else BG, 14, a, LINE)
+            setPadding(a.dp(14), a.dp(10), a.dp(10), a.dp(10))
+        }
+        val t = text(a, label + "\n" + if (on) "Zapnuto" else "Vypnuto", 19f, bold = true, color = if (on) OK else MUTED)
+        row.addView(t, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        val sw = android.widget.Switch(a).apply {
+            isChecked = on
+            scaleX = 1.5f; scaleY = 1.5f
+            setPadding(a.dp(8), 0, a.dp(8), 0)
+            setOnCheckedChangeListener { _, v -> change(v) }
+        }
+        row.addView(sw, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = a.dp(12) })
+        row.setOnClickListener { sw.toggle() }
+        return row
+    }
+
+    /** Zeptat se „Opravdu…?“ s velkými tlačítkami Ano / Ne, ať omylem ťuknutí nic nesmaže. */
+    fun confirm(a: Activity, question: String, yes: String = "Ano, odebrat", onYes: () -> Unit) {
+        val box = column(a, 20, 14)
+        box.addView(text(a, question, 24f, bold = true, center = true))
+        val d = android.app.AlertDialog.Builder(a).setView(box).create()
+        box.addView(button(a, yes, BAD, sp = 22f) { d.dismiss(); onYes() }.apply { minHeight = a.dp(80) })
+        box.addView(button(a, "Ne, nechat", OK, sp = 22f) { d.dismiss() }.apply { minHeight = a.dp(80) })
+        d.show()
+    }
+
     /** Překreslit, až se člověk přestane dotýkat displeje (aby se mu tlačítko neposunulo pod prstem). */
     fun whenIdle(a: Activity, tries: Int = 20, action: () -> Unit) {
         if (a.isFinishing) return
