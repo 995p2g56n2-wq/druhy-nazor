@@ -59,6 +59,9 @@ class DnSetupActivity : Activity() {
      * Každý krok: proč (jedna věta), co udělat v okénku telefonu, a jako poslední věta
      * vždy to, co udělat teď: „Teď ťukněte dole na …“. Nejvýš 3 věty, bez slova „aplikace“.
      */
+    /** Dát na plochu i velké tlačítko Pomoc. */
+    private val withHelp by lazy { Care.enabled(this, Care.POMOC) && !PomocWidget.placed(this) }
+
     private val steps by lazy { listOf(
         Step("voice", "🗣️", "Český hlas",
             "Telefon zatím neumí mluvit česky.",
@@ -71,11 +74,13 @@ class DnSetupActivity : Activity() {
             "Budu hlídat vaše zprávy a hovory, abych vás včas varovala.",
             "Ukážou se okénka pro oznámení, hovory a SMS. V každém stiskněte Povolit."),
         if (needsAppIcon) Step("uklid", "✉️", "Ikony na plochu",
-            "Na plochu dám štít Postaráno a obálku Zprávy, která hlídá podvody.",
-            "Ukážou se dvě okénka a v obou zmáčkněte Přidat.")
-        else Step("uklid", "✉️", "Obálka na plochu",
-            "Na plochu dám obálku Zprávy, která hlídá podvody.",
-            "V okénku pak zmáčkněte Přidat."),
+            if (withHelp) "Na plochu dám štít Postaráno, obálku Zprávy a velké červené tlačítko Pomoc."
+            else "Na plochu dám štít Postaráno a obálku Zprávy, která hlídá podvody.",
+            if (withHelp) "Ukážou se tři okénka a ve všech zmáčkněte Přidat." else "Ukážou se dvě okénka a v obou zmáčkněte Přidat.")
+        else Step("uklid", "✉️", if (withHelp) "Ikony na plochu" else "Obálka na plochu",
+            if (withHelp) "Na plochu dám obálku Zprávy a velké červené tlačítko Pomoc."
+            else "Na plochu dám obálku Zprávy, která hlídá podvody.",
+            if (withHelp) "Ukážou se dvě okénka a v obou zmáčkněte Přidat." else "V okénku pak zmáčkněte Přidat."),
         Step("calls", "📞", "Hlídání hovorů",
             "Budu hlídat hovory, abych poznala podvodníka dřív, než zvednete telefon.",
             "V okénku je několik řádků. Ťukněte jen na řádek Postaráno a pak vpravo dole na Změnit na výchozí."),
@@ -356,7 +361,7 @@ class DnSetupActivity : Activity() {
     private fun later(label: String = "Později", onClick: () -> Unit) =
         Ui.button(this, label, Ui.BG, Ui.MUTED, sp = 16f) { onClick() }
 
-    /** Co ještě dát na plochu: "app" = štít Postaráno, "zpravy" = obálka Zprávy. */
+    /** Co ještě dát na plochu: "app" = štít Postaráno, "zpravy" = obálka Zprávy, "pomoc" = červená Pomoc. */
     private val pinQueue = ArrayDeque<String>()
     /** Číslo posledního okénka, aby starý odpočet neposunul průvodce u dalšího okénka. */
     private var pinToken = 0
@@ -392,6 +397,7 @@ class DnSetupActivity : Activity() {
                 pinQueue.clear()
                 if (needsAppIcon) pinQueue.addLast("app")
                 pinQueue.addLast("zpravy")
+                if (withHelp) pinQueue.addLast("pomoc")
                 pinNext()
             }
             "perms" -> requestPermissions(perms(), 10)
@@ -533,9 +539,18 @@ class DnSetupActivity : Activity() {
     companion object {
         /** Dá na plochu štít Postaráno nebo obálku Zprávy. */
         fun pinShortcut(ctx: Context, what: String): Boolean {
+            // Pomoc: nejradši velké tlačítko (2 × 2 ikony), jinak aspoň obyčejná ikona
+            if (what == "pomoc" && (PomocWidget.placed(ctx) || PomocWidget.pin(ctx))) return !PomocWidget.placed(ctx)
             val sm = ctx.getSystemService(ShortcutManager::class.java) ?: return false
             if (!sm.isRequestPinShortcutSupported) return false
-            val info = if (what == "app") {
+            val info = if (what == "pomoc") {
+                ShortcutInfo.Builder(ctx, "pomoc")
+                    .setShortLabel("Pomoc")
+                    .setLongLabel("Pomoc: zavolat rodině")
+                    .setIcon(Icon.createWithResource(ctx, R.drawable.ic_sos))
+                    .setIntent(Intent(ctx, HelpActivity::class.java).setAction(Intent.ACTION_VIEW))
+                    .build()
+            } else if (what == "app") {
                 ShortcutInfo.Builder(ctx, "postarano")
                     .setShortLabel("Postaráno")
                     .setIcon(Icon.createWithResource(ctx, R.drawable.ic_shield))

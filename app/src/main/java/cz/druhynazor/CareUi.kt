@@ -35,8 +35,8 @@ object CareUi {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "🆘  Pomoc", 22f, bold = true))
         card.addView(Ui.text(a,
-            "Velké červené tlačítko na úvodní obrazovce. Po 5 vteřinách pošle rodině SMS s polohou a zavolá prvnímu v seznamu. " +
-                "Do té doby jde zrušit.", 17f, color = Ui.MUTED))
+            "Velké červené tlačítko na úvodní obrazovce. Po 15 vteřinách pošle rodině SMS s polohou a zavolá prvnímu v seznamu. " +
+                "Do té doby jde zrušit obrovským tlačítkem Zrušit.", 17f, color = Ui.MUTED))
         card.addView(toggle(a, Care.POMOC, "Ukázat tlačítko Pomoc", onChanged))
         if (!Care.enabled(a, Care.POMOC)) return card
         val loc = Help.locationAllowed(a)
@@ -54,6 +54,17 @@ object CareUi {
                     Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.CALL_PHONE), REQ_HELP_PERMS)
             })
         }
+        if (PomocWidget.placed(a)) {
+            card.addView(Ui.text(a, "✅ Velké tlačítko Pomoc je na ploše.", 18f, bold = true, color = Ui.OK))
+        } else {
+            card.addView(Ui.text(a,
+                "Velké tlačítko Pomoc jde dát přímo na plochu telefonu, aby se nemuselo nic hledat. " +
+                    "Ťukněte sem a v okénku na Přidat.", 17f, color = Ui.MUTED))
+            card.addView(Ui.button(a, "🆘  Dát Pomoc na plochu", Ui.BAD, sp = 19f) {
+                if (!DnSetupActivity.pinShortcut(a, "pomoc"))
+                    Toast.makeText(a, "Tento telefon neumí přidat tlačítko na plochu.", Toast.LENGTH_LONG).show()
+            })
+        }
         card.addView(Ui.button(a, "Vyzkoušet Pomoc (rodině přijde SMS se slovem ZKOUŠKA)", Ui.CARD, Ui.ACCENT, sp = 16f) {
             a.startActivity(Intent(a, HelpActivity::class.java).putExtra(HelpActivity.EXTRA_TEST, true))
         })
@@ -66,7 +77,7 @@ object CareUi {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "❤️  Jsem v pořádku", 22f, bold = true))
         card.addView(Ui.text(a,
-            "Každý den v ${Care.checkTime(a)} se zeptá „Jak se máte?“. Když neodpoví, zeptá se znovu, " +
+            "Každý den v ${Care.checkTime(a)} se zeptá „Jak se máte?“. Když neodpoví, ptá se každých 15 minut, " +
                 "a když neodpoví do ${Care.deadlineTime(a)}, přijde vám SMS. Při odpovědi Není mi dobře vám přijde SMS hned.",
             17f, color = Ui.MUTED))
         card.addView(toggle(a, Care.OK, "Ptát se každý den", onChanged))
@@ -91,7 +102,7 @@ object CareUi {
         card.addView(Ui.text(a, "💊  Léky", 22f, bold = true))
         card.addView(Ui.text(a,
             "V zadaný čas lék připomene nahlas přes celou obrazovku. Když neťukne na ${Care.takenLabel(Prefs(a))}, " +
-                "připomene to znovu po 15 a 30 minutách a po hodině vám přijde SMS.", 17f, color = Ui.MUTED))
+                "připomíná to každých 5 minut a po hodině vám přijde SMS.", 17f, color = Ui.MUTED))
         card.addView(toggle(a, Care.LEKY, "Připomínat léky", onChanged))
         if (!Care.enabled(a, Care.LEKY)) return card
 

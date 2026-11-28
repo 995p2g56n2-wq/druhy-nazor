@@ -296,37 +296,44 @@ class MainActivity : Activity() {
         status.addView(Ui.text(this, sub, 21f, center = true))
         root.addView(status)
 
-        // Dlaždice jen pro to, na co senior opravdu klepne
-        val tiles = mutableListOf<Pair<String, () -> Unit>>()
-        tiles += "✉️\nZprávy" to {
+        // Dlaždice jen pro to, na co senior opravdu klepne. Všechny stejně velké, Pomoc je červená.
+        data class Tile(val label: String, val red: Boolean = false, val open: () -> Unit)
+        val tiles = mutableListOf<Tile>()
+        tiles += Tile("✉️\nZprávy") {
             startActivity(Intent(this, DruhyNazorActivity::class.java).putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true))
         }
-        if (Modules.DOPIS in Modules.installed(this)) tiles += "📄\nDopis" to {
+        if (Modules.DOPIS in Modules.installed(this)) tiles += Tile("📄\nDopis") {
             startActivity(Intent(this, LetterActivity::class.java))
+        }
+        if (Care.enabled(this, Care.LEKY)) tiles += Tile("💊\nLéky") {
+            startActivity(Intent(this, CareActivity::class.java).putExtra(CareActivity.EXTRA_MODE, CareActivity.MODE_OVERVIEW))
+        }
+        if (Care.enabled(this, Care.OK)) tiles += Tile("❤️\nJsem v pořádku") {
+            startActivity(Intent(this, CareActivity::class.java).putExtra(CareActivity.EXTRA_MODE, CareActivity.MODE_CHECK)
+                .putExtra(CareActivity.EXTRA_TILE, true))
+        }
+        if (Care.enabled(this, Care.POMOC)) tiles += Tile("🆘\nPomoc", red = true) {
+            startActivity(Intent(this, HelpActivity::class.java))
         }
         // Další hotoví pomocníci sem přibydou sami.
         tiles.chunked(2).forEach { pair ->
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            pair.forEachIndexed { i, (label, open) ->
-                val tile = Ui.button(this, label, Ui.CARD, Ui.INK, sp = 26f) { open() }.apply {
-                    minHeight = dp(170)
+            pair.forEachIndexed { i, t ->
+                val bg = if (t.red) Ui.BAD else Ui.CARD
+                val tile = Ui.button(this, t.label, bg, if (t.red) android.graphics.Color.WHITE else Ui.INK, sp = 24f) { t.open() }.apply {
+                    minHeight = dp(150)
                     maxLines = 4
                     ellipsize = null
                     setPadding(dp(6), dp(16), dp(6), dp(16))
-                    background = Ui.rounded(Ui.CARD, 22, this@MainActivity, Ui.LINE)
+                    background = Ui.rounded(bg, 22, this@MainActivity, if (t.red) null else Ui.LINE)
                 }
                 row.addView(tile, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    if (i == 0 && pair.size == 2) marginEnd = dp(14)
+                    if (i == 0) marginEnd = dp(14)
                 })
             }
+            // Lichá poslední dlaždice: stejná šířka jako ostatní
+            if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
             root.addView(row)
-        }
-
-        // Pomoc: velké červené tlačítko přes celou šířku
-        if (Care.enabled(this, Care.POMOC)) {
-            root.addView(Ui.button(this, "🆘  Pomoc", Ui.BAD, android.graphics.Color.WHITE, sp = 30f) {
-                startActivity(Intent(this, HelpActivity::class.java))
-            }.apply { minHeight = dp(120) })
         }
 
         spacer(root, 24)

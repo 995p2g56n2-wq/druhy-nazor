@@ -31,10 +31,13 @@ object Care {
 
     private const val MIN = 60_000L
 
-    /** Léky: znovu připomenout po 15 a 30 minutách, po hodině SMS rodině. */
-    val MED_STEPS = longArrayOf(0, 15 * MIN, 30 * MIN, 60 * MIN)
-    /** Jsem v pořádku: zeptat se, po půl druhé hodině znovu, po třech hodinách SMS rodině. */
-    val CHECK_STEPS = longArrayOf(0, 90 * MIN, 180 * MIN)
+    /** Léky: připomínat každých 5 minut, dokud senior nepotvrdí. Po hodině naposledy a SMS rodině. */
+    val MED_STEPS = LongArray(13) { it * 5 * MIN }
+    /** Poslední krok léků, kdy jde SMS rodině (po hodině). */
+    const val MED_SMS_STEP = 12
+    /** Jsem v pořádku: ptát se každých 15 minut až 6 hodin, dokud senior neodpoví. Po 3 hodinách SMS rodině. */
+    val CHECK_STEPS = LongArray(24) { it * 15 * MIN }
+    const val CHECK_SMS_STEP = 12
 
     fun prefs(ctx: Context) = ctx.applicationContext.getSharedPreferences("pece", Context.MODE_PRIVATE)
 
@@ -88,6 +91,12 @@ object Care {
         }
     }
 
+    /** Lék byl dnes potvrzený. */
+    fun takenToday(ctx: Context, m: Med): Boolean {
+        val t = prefs(ctx).getLong("vzato_${m.id}", 0L)
+        return t > 0 && sameDay(t, System.currentTimeMillis())
+    }
+
     /** Senior ťukl na Vzala jsem. Když už rodina dostala SMS, že lék nepotvrdil(a), dostane i tuhle. */
     fun markTaken(ctx: Context, list: List<Med>) {
         val p = prefs(ctx)
@@ -115,7 +124,7 @@ object Care {
     fun checkTime(ctx: Context) = "%d:%02d".format(checkHour(ctx), checkMinute(ctx))
     /** Do kdy musí senior odpovědět, jinak SMS rodině. */
     fun deadlineTime(ctx: Context): String {
-        val total = checkHour(ctx) * 60 + checkMinute(ctx) + (CHECK_STEPS.last() / MIN).toInt()
+        val total = checkHour(ctx) * 60 + checkMinute(ctx) + (CHECK_STEPS[CHECK_SMS_STEP] / MIN).toInt()
         return "%d:%02d".format((total / 60) % 24, total % 60)
     }
 
@@ -135,7 +144,8 @@ object Care {
     /** Senior odpověděl. good = Dobře, jinak Není mi dobře. */
     fun answerCheck(ctx: Context, good: Boolean) {
         val p = prefs(ctx)
-        val late = p.getLong("hlaseno_c", 0L) >= p.getLong("kdy_c", Long.MAX_VALUE)
+        // Rodina už dostala SMS, že neodpovídá (a jde o dnešní otázku): dát vědět, že se ozval(a)
+        val late = checkPending(ctx) && p.getLong("hlaseno_c", 0L) >= p.getLong("kdy_c", Long.MAX_VALUE)
         p.edit().putLong("odpoved_c", System.currentTimeMillis()).apply()
         for (step in 1 until CHECK_STEPS.size) clear(ctx, "c|$step")
         val prefsMain = Prefs(ctx)
@@ -145,6 +155,11 @@ object Care {
         } else if (late) {
             Family.sms(ctx, "Postaráno: ${prefsMain.seniorName} se už ${g(prefsMain, "ozvala", "ozval")}: je v pořádku. Nemusíte nic dělat.")
         }
+    }
+
+    private fun sameDay(a: Long, b: Long): Boolean {
+        val z = ZoneId.systemDefault()
+        return Instant.ofEpochMilli(a).atZone(z).toLocalDate() == Instant.ofEpochMilli(b).atZone(z).toLocalDate()
     }
 
     // ---------- Oslovení podle toho, jak seniorovi říkají ----------
@@ -239,8 +254,9 @@ object Care {
                     for (s in 1 until MED_STEPS.size) set(ctx, "m|${med.id}|$s", now + MED_STEPS[s])
                 }
                 if (p.getLong("vzato_${med.id}", 0L) >= p.getLong("kdy_${med.id}", 0L)) return
-                if (step < MED_STEPS.size - 1) CareActivity.showMeds(ctx)
+                if (step != MED_SMS_STEP) CareActivity.showMeds(ctx)
                 else {
+                    CareActivity.showMeds(ctx)
                     p.edit().putLong("hlaseno_${med.id}", now).apply()
                     val prefsMain = Prefs(ctx)
                     Family.sms(ctx, "Postaráno: ${prefsMain.seniorName} zatím ${g(prefsMain, "nepotvrdila", "nepotvrdil")}, " +
@@ -253,12 +269,16 @@ object Care {
                 val step = parts[1].toIntOrNull() ?: return
                 if (step == 0) {
                     set(ctx, "c|0", nextAt(now + MIN, checkHour(ctx), checkMinute(ctx)))
+                    // Senior už dnes odpověděl sám (dlaždice na úvodní obrazovce): neptat se znovu
+                    val answered = p.getLong("odpoved_c", 0L)
+                    if (answered > 0 && sameDay(answered, now)) return
                     p.edit().putLong("kdy_c", now).apply()
                     for (s in 1 until CHECK_STEPS.size) set(ctx, "c|$s", now + CHECK_STEPS[s])
                 }
                 if (p.getLong("odpoved_c", 0L) >= p.getLong("kdy_c", 0L)) return
-                if (step < CHECK_STEPS.size - 1) CareActivity.showCheck(ctx)
+                if (step != CHECK_SMS_STEP) CareActivity.showCheck(ctx)
                 else {
+                    CareActivity.showCheck(ctx)
                     p.edit().putLong("hlaseno_c", now).apply()
                     val prefsMain = Prefs(ctx)
                     Family.sms(ctx, "Postaráno: ${prefsMain.seniorName} dnes do ${deadlineTime(ctx)} ${g(prefsMain, "neodpověděla", "neodpověděl")} " +
