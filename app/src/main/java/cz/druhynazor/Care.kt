@@ -122,6 +122,12 @@ object Care {
     fun checkHour(ctx: Context) = prefs(ctx).getInt("ok_h", 9)
     fun checkMinute(ctx: Context) = prefs(ctx).getInt("ok_m", 0)
     fun checkTime(ctx: Context) = "%d:%02d".format(checkHour(ctx), checkMinute(ctx))
+
+    /** Jak často se ptát: 1 = každý den, 3 = každé 3 dny, 7 = jednou týdně. */
+    val CHECK_EVERY = listOf(1, 3, 7)
+    fun checkEvery(ctx: Context) = prefs(ctx).getInt("ok_kazdych", 1).takeIf { it in CHECK_EVERY } ?: 1
+    fun setCheckEvery(ctx: Context, days: Int) = prefs(ctx).edit().putInt("ok_kazdych", days).apply()
+    fun everyLabel(days: Int) = when (days) { 3 -> "každé 3 dny"; 7 -> "jednou týdně"; else -> "každý den" }
     /** Do kdy musí senior odpovědět, jinak SMS rodině. */
     fun deadlineTime(ctx: Context): String {
         val total = checkHour(ctx) * 60 + checkMinute(ctx) + (CHECK_STEPS[CHECK_SMS_STEP] / MIN).toInt()
@@ -272,6 +278,10 @@ object Care {
                     // Senior už dnes odpověděl sám (dlaždice na úvodní obrazovce): neptat se znovu
                     val answered = p.getLong("odpoved_c", 0L)
                     if (answered > 0 && sameDay(answered, now)) return
+                    // Ptát se jen každé 3 dny / jednou týdně: od poslední otázky nebo odpovědi ještě neuplynulo dost
+                    val every = checkEvery(ctx)
+                    val last = maxOf(answered, p.getLong("kdy_c", 0L))
+                    if (every > 1 && last > 0 && now - last < every * 24 * 60 * MIN - 3 * 60 * MIN) return
                     p.edit().putLong("kdy_c", now).apply()
                     for (s in 1 until CHECK_STEPS.size) set(ctx, "c|$s", now + CHECK_STEPS[s])
                 }
