@@ -188,7 +188,7 @@ class DruhyNazorActivity : Activity() {
             Toast.makeText(this, "Stahuji…", Toast.LENGTH_SHORT).show()
             SharedList.refresh(this, force = true) { ok ->
                 Toast.makeText(this, if (ok) "Staženo" else "Nepodařilo se, zkontrolujte internet", Toast.LENGTH_SHORT).show()
-                if (!isFinishing) render()
+                Ui.whenIdle(this) { render() }
             }
             SharedList.sendQueue(this)
         })
@@ -248,9 +248,8 @@ class DruhyNazorActivity : Activity() {
     override fun onBackPressed() { backHome() }
 
     private fun show(root: View) {
-        setContentView(ScrollView(this).apply {
-            setBackgroundColor(Ui.BG); isFillViewport = true; addView(root)
-        })
+        // Po zapnutí či vypnutí pomocníka zůstat na stejném místě, ne skočit nahoru
+        Ui.show(this, root)
     }
 
     private fun messageRow(sms: Sms): View {
