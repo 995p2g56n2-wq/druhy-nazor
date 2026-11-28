@@ -93,6 +93,10 @@ class HelpActivity : Activity() {
             root.addView(Ui.button(this, "🚑  Záchranka 155", Color.WHITE, Ui.BAD, sp = 24f) {
                 startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:155")))
             })
+            // Není to nouze, ale potřeba si s někým promluvit: bezplatná Linka seniorů
+            root.addView(Ui.button(this, "☎️  Popovídat si: Linka seniorů 800 200 007 (zdarma)", Color.WHITE, Ui.ACCENT, sp = 18f) {
+                Linka.call(this)
+            })
             root.addView(Ui.button(this, "Zavřít", Ui.BAD, Color.WHITE, sp = 18f) { finish() })
         }
         setContentView(ScrollView(this).apply { setBackgroundColor(Ui.BAD); isFillViewport = true; addView(root) })

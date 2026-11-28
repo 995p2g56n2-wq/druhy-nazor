@@ -4,4 +4,5 @@
     <include domain="sharedpref" path="." />
         <exclude domain="sharedpref" path="zarizeni.xml" />
         <exclude domain="sharedpref" path="dopisy.xml" />
+        <exclude domain="sharedpref" path="rodina_posta.xml" />
 </full-backup-content>

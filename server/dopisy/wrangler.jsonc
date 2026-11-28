@@ -8,5 +8,9 @@
   // Klíč aplikace (není tajný, jen odradí náhodné návštěvníky). Klíč k Claude se zadává
   // v Cloudflare jako tajná proměnná ANTHROPIC_API_KEY, nikdy ne sem.
   // NTFY_TEMA: kanál v aplikaci ntfy, kam přijde upozornění, když dojde kredit nebo nefunguje klíč.
-  "vars": { "POSTARANO_KLIC": "postarano-dopisy-v1", "NTFY_TEMA": "postarano-kredit-82fca67bc1" }
+  "vars": { "POSTARANO_KLIC": "postarano-dopisy-v1", "NTFY_TEMA": "postarano-kredit-82fca67bc1" },
+  // Od rodiny: každý senior má malou schránku na fotky a vzkazy od rodiny (Durable Object se SQLite,
+  // funguje i v bezplatném tarifu Cloudflare, nic se nemusí zakládat ručně).
+  "durable_objects": { "bindings": [{ "name": "SCHRANKY", "class_name": "RodinnaSchranka" }] },
+  "migrations": [{ "tag": "rodina-v1", "new_sqlite_classes": ["RodinnaSchranka"] }]
 }

@@ -41,6 +41,10 @@ class BootReceiver : BroadcastReceiver() {
         }
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) LetterReminder.restore(context)
         // Po zapnutí telefonu i po aktualizaci aplikace naplánovat Léky a Jsem v pořádku znovu
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) Care.restore(context)
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            Care.restore(context)
+            FamilyMail.schedule(context)
+            Weather.schedule(context)
+        }
     }
 }
