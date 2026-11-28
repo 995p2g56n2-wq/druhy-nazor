@@ -91,6 +91,13 @@
 
         <receiver android:name=".LetterReminderReceiver" android:exported="false" />
         <receiver android:name=".CareReceiver" android:exported="false" />
+        <receiver android:name=".FamilyMailReceiver" android:exported="false" />
+        <activity
+            android:name=".FamilyMailActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait" />
         <receiver android:name=".PomocWidget" android:exported="false" android:label="Pomoc">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

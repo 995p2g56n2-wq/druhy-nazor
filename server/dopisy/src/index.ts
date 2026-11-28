@@ -8,6 +8,9 @@
  * Nic se tu neukládá: text dopisu jen projde do Claude a odpověď zpět.
  */
 import Anthropic from "@anthropic-ai/sdk";
+import { rodina, RodinnaSchranka } from "./rodina";
+
+export { RodinnaSchranka };
 
 export interface Env {
   /** Tajná proměnná v Cloudflare (Settings → Variables and Secrets). */
@@ -16,6 +19,8 @@ export interface Env {
   POSTARANO_KLIC: string;
   /** Kanál v aplikaci ntfy pro upozornění správci (wrangler.jsonc). */
   NTFY_TEMA?: string;
+  /** Schránky Od rodiny (fotky a vzkazy od rodiny), viz rodina.ts. */
+  SCHRANKY: DurableObjectNamespace<RodinnaSchranka>;
 }
 
 /** Upozornění správci do aplikace ntfy, nejvýš jednou za 6 hodin. */
@@ -115,6 +120,9 @@ function odpoved(data: unknown, status = 200): Response {
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // Od rodiny: fotky a vzkazy od rodiny (nic společného s Claude)
+    const r = await rodina(req, env);
+    if (r) return r;
     const res = await obsluha(req, env);
     if (res.status >= 400) {
       const chyba = ((await res.clone().json().catch(() => ({}))) as { chyba?: string }).chyba;

@@ -5,10 +5,12 @@
         <include domain="sharedpref" path="." />
         <exclude domain="sharedpref" path="zarizeni.xml" />
         <exclude domain="sharedpref" path="dopisy.xml" />
+        <exclude domain="sharedpref" path="rodina_posta.xml" />
     </cloud-backup>
     <device-transfer>
         <include domain="sharedpref" path="." />
         <exclude domain="sharedpref" path="zarizeni.xml" />
         <exclude domain="sharedpref" path="dopisy.xml" />
+        <exclude domain="sharedpref" path="rodina_posta.xml" />
     </device-transfer>
 </data-extraction-rules>

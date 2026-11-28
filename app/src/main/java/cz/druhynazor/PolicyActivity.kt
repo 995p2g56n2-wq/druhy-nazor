@@ -87,37 +87,47 @@ class PolicyActivity : Activity() {
                 "Hlášení můžete vypnout v části Pro rodinu, vypínač Hlásit podvodníky do společného seznamu.\n\n" +
                 "Jednou za hodinu si telefon seznam stahuje z GitHubu. GitHub přitom vidí IP adresu telefonu.",
 
-            "6. Číslo v seznamu omylem" to
+            "6. Fotky a vzkazy od rodiny (Od rodiny)" to
+                "Co: fotky, hlasové a psané vzkazy, které vám pošle rodina přes svůj odkaz, jméno toho, kdo je poslal, " +
+                "a jestli jste je viděli nebo poslali srdíčko. Dále jména lidí z rodiny a to, jak vám říkají (třeba Babička). " +
+                "Vaše telefonní číslo ani čísla rodiny se na server neposílají.\n" +
+                "Komu: na náš server u Cloudflare (Cloudflare Inc., USA). Vidí to jen lidé z rodiny, kteří mají odkaz.\n" +
+                "Proč: aby vám rodina mohla posílat fotky a vzkazy.\n" +
+                "Jak dlouho: 30 dní, pak se samy smažou, na serveru i v telefonu. Ve schránce je nejvýš 40 věcí.\n" +
+                "Právní důvod: váš souhlas (čl. 6 odst. 1 písm. a) GDPR).\n\n" +
+                "Vypnout jde v části Pro rodinu, vypínač Zapnout Od rodiny.",
+
+            "7. Číslo v seznamu omylem" to
                 "Pokud se vaše číslo dostalo do seznamu podvodníků omylem, napište na [doplníme: e-mail]. " +
                 "Do 3 pracovních dnů ho vyřadíme a už se do seznamu nevrátí. " +
                 "Proti zpracování můžete podat námitku (čl. 21 GDPR).",
 
-            "7. Záloha" to
+            "8. Záloha" to
                 "Když máte v telefonu zapnutou zálohu Google, uloží se do vašeho účtu Google nastavení: kdo je v rodině " +
                 "a jak vám říkají. Shrnutí dopisů a fotky se nezálohují.",
 
-            "8. Předání mimo Evropskou unii" to
+            "9. Předání mimo Evropskou unii" to
                 "ntfy.sh, GitHub, Cloudflare i Anthropic sídlí v USA. U GitHubu a Cloudflare spoléháme na rozhodnutí Evropské komise " +
                 "o odpovídající ochraně (EU–US Data Privacy Framework, čl. 45 GDPR). U ntfy.sh a Anthropic [doplníme po ověření]. " +
                 "Do společného seznamu se posílá jen číslo podvodníka, adresa webu a náhodné označení telefonu. " +
                 "Text dopisu jen se souhlasem podle bodu 4.",
 
-            "9. Co neděláme" to
+            "10. Co neděláme" to
                 "•  Údaje neprodáváme a nepoužíváme je k reklamě.\n" +
                 "•  Nemáme uživatelské účty a nesbíráme statistiky o používání.\n" +
                 "•  Text SMS a zpráv neposíláme žádné umělé inteligenci. Text dopisů jen tehdy, když s tím souhlasíte (bod 4).",
 
-            "10. Vaše práva" to
+            "11. Vaše práva" to
                 "Máte právo vědět, jaké údaje o vás máme, nechat je opravit nebo smazat, omezit jejich zpracování, " +
                 "vznést námitku a odvolat souhlas (čl. 15 až 21 GDPR). Stížnost můžete podat Úřadu pro ochranu osobních " +
                 "údajů, Pplk. Sochora 27, 170 00 Praha 7, www.uoou.gov.cz (čl. 77 GDPR).",
 
-            "11. Bezpečnost a odpovědnost" to
+            "12. Bezpečnost a odpovědnost" to
                 "Údaje v telefonu chrání Android. Spojení s ntfy.sh, GitHubem, Cloudflare i Anthropic je šifrované (HTTPS).\n\n" +
                 "Varování je pomůcka. Nezaručí, že Postaráno pozná každý podvod, a může se splést i opačně. " +
                 "Při pochybnostech vždy zavolejte někomu z rodiny nebo přímo bance či policii.",
 
-            "12. Změny" to
+            "13. Změny" to
                 "O důležitých změnách vás předem upozorníme a požádáme o nový souhlas. Platí od [doplníme: datum].",
         )
     }

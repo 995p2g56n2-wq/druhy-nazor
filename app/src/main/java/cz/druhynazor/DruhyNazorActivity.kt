@@ -106,6 +106,8 @@ class DruhyNazorActivity : Activity() {
 
         // ---- Léky, Jsem v pořádku, Pomoc ----
         CareUi.cards(this, root) { render() }
+        // ---- Od rodiny, Hádanka, Počasí, Nárok, Rádio ----
+        FunUi.cards(this, root) { render() }
 
         // ---- Jak seniorovi říkají ----
         val call = Ui.card(this)

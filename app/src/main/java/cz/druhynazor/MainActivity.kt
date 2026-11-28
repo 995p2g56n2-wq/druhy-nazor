@@ -62,6 +62,9 @@ class MainActivity : Activity() {
         if (screen == Screen.HOME && !letterPrepared) { letterPrepared = true; LetterActivity.prepare(this) }
         // Léky a Jsem v pořádku: budíky naplánovat (nic se nezdvojí)
         Care.restore(this)
+        // Od rodiny: pravidelná kontrola, a hned teď se podívat, jestli něco nepřišlo
+        FamilyMail.schedule(this)
+        if (screen == Screen.HOME) FamilyMail.checkNow(this) { n -> if (n > 0 && !isFinishing && screen == Screen.HOME) render() }
         // Hlídání po spuštění chvíli nabíhá (třeba po aktualizaci), stav pak zkontrolovat znovu.
         // Teprve potom případně dát vědět rodině, že ochrana není celá zapnutá.
         window.decorView.postDelayed({
@@ -171,6 +174,7 @@ class MainActivity : Activity() {
             "Varování je pomůcka a nepozná úplně každý podvod. Text zpráv nikam neposíláme, jen rodině v SMS. " +
                 "Dopis přečte umělá inteligence, jen když s tím u dopisu souhlasíte. " +
                 "Léky, odpověď na Jak se máte a místo, kde jste, když zmáčknete Pomoc, dostane jen rodina v SMS. " +
+                "Fotky a vzkazy od rodiny leží 30 dní na našem serveru. " +
                 "Hlášení do společného seznamu a každého pomocníka jde vypnout v části Pro rodinu.",
             16f, center = true, color = Ui.MUTED))
     }
@@ -312,6 +316,12 @@ class MainActivity : Activity() {
             startActivity(Intent(this, CareActivity::class.java).putExtra(CareActivity.EXTRA_MODE, CareActivity.MODE_CHECK)
                 .putExtra(CareActivity.EXTRA_TILE, true))
         }
+        if (FamilyMail.enabled(this) && family.isNotEmpty()) {
+            val n = FamilyMail.unseen(this)
+            tiles += Tile("📷\nOd rodiny" + if (n > 0) "\n🔴 $n nové" else "") {
+                startActivity(Intent(this, FamilyMailActivity::class.java))
+            }
+        }
         if (Care.enabled(this, Care.POMOC)) tiles += Tile("🆘\nPomoc", red = true) {
             startActivity(Intent(this, HelpActivity::class.java))
         }
@@ -380,7 +390,7 @@ class MainActivity : Activity() {
     companion object {
         private const val REQ_DN_SETUP = 20
         /** Zvýšit, když se změní, co se posílá ven. Senior pak souhlasí znovu. */
-        const val CONSENT_VERSION = 3
+        const val CONSENT_VERSION = 4
         private const val DAY = 24L * 3600 * 1000
     }
 }
