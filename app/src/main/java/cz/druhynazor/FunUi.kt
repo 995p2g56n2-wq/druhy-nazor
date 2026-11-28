@@ -39,7 +39,7 @@ object FunUi {
         val card = Ui.card(a)
         card.addView(Ui.text(a, "📷  Od rodiny", 22f, bold = true))
         card.addView(Ui.text(a,
-            "Pošlete ${prefs.seniorGenitive.let { if (it == "vašeho blízkého") "svému blízkému" else "na telefon $it" }} fotku, " +
+            "Pošlete ${prefs.seniorGenitive.let { if (it == "vašeho blízkého") "svému blízkému" else "na telefon $it" }} fotku, krátké video, " +
                 "hlasový nebo psaný vzkaz. Ukáže se přes celou obrazovku a přečte se nahlas. Odpovědět může srdíčkem nebo vám zavolá. " +
                 "Každý z rodiny má vlastní odkaz, přijde mu jednou v SMS. Telefon se dívá na novinky každých 15 minut, potřebuje internet.",
             17f, color = Ui.MUTED))
