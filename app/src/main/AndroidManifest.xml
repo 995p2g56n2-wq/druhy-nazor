@@ -35,6 +35,8 @@
         <package android:name="org.telegram.messenger" />
         <package android:name="com.viber.voip" />
         <package android:name="com.instagram.android" />
+        <!-- Rádio: oficiální aplikace Českého rozhlasu -->
+        <package android:name="cz.rozhlas.mujrozhlas" />
     </queries>
 
     <application
@@ -92,6 +94,15 @@
         <receiver android:name=".LetterReminderReceiver" android:exported="false" />
         <receiver android:name=".CareReceiver" android:exported="false" />
         <receiver android:name=".FamilyMailReceiver" android:exported="false" />
+        <receiver android:name=".WeatherReceiver" android:exported="false" />
+        <activity android:name=".QuizActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".BenefitsActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity
+            android:name=".WeatherActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait" />
         <activity
             android:name=".FamilyMailActivity"
             android:exported="false"

@@ -64,6 +64,7 @@ class MainActivity : Activity() {
         Care.restore(this)
         // Od rodiny: pravidelná kontrola, a hned teď se podívat, jestli něco nepřišlo
         FamilyMail.schedule(this)
+        Weather.schedule(this)
         if (screen == Screen.HOME) FamilyMail.checkNow(this) { n -> if (n > 0 && !isFinishing && screen == Screen.HOME) render() }
         // Hlídání po spuštění chvíli nabíhá (třeba po aktualizaci), stav pak zkontrolovat znovu.
         // Teprve potom případně dát vědět rodině, že ochrana není celá zapnutá.
@@ -174,7 +175,7 @@ class MainActivity : Activity() {
             "Varování je pomůcka a nepozná úplně každý podvod. Text zpráv nikam neposíláme, jen rodině v SMS. " +
                 "Dopis přečte umělá inteligence, jen když s tím u dopisu souhlasíte. " +
                 "Léky, odpověď na Jak se máte a místo, kde jste, když zmáčknete Pomoc, dostane jen rodina v SMS. " +
-                "Fotky a vzkazy od rodiny leží 30 dní na našem serveru. " +
+                "Fotky a vzkazy od rodiny leží 30 dní na našem serveru, pro počasí se posílá jen přibližné místo. " +
                 "Hlášení do společného seznamu a každého pomocníka jde vypnout v části Pro rodinu.",
             16f, center = true, color = Ui.MUTED))
     }
@@ -322,6 +323,16 @@ class MainActivity : Activity() {
                 startActivity(Intent(this, FamilyMailActivity::class.java))
             }
         }
+        if (Quiz.enabled(this)) tiles += Tile("🧩\nHádanka" + if (!Quiz.doneToday(this)) "\n🔴 dnešní" else "") {
+            startActivity(Intent(this, QuizActivity::class.java))
+        }
+        if (Weather.enabled(this)) tiles += Tile("☀️\nPočasí") {
+            startActivity(Intent(this, WeatherActivity::class.java))
+        }
+        if (Radio.enabled(this) && Radio.installed(this)) tiles += Tile("📻\nRádio") { Radio.open(this) }
+        if (Care.enabled(this, BENEFITS)) tiles += Tile("💰\nNa co mám nárok") {
+            startActivity(Intent(this, BenefitsActivity::class.java))
+        }
         if (Care.enabled(this, Care.POMOC)) tiles += Tile("🆘\nPomoc", red = true) {
             startActivity(Intent(this, HelpActivity::class.java))
         }
@@ -391,6 +402,8 @@ class MainActivity : Activity() {
         private const val REQ_DN_SETUP = 20
         /** Zvýšit, když se změní, co se posílá ven. Senior pak souhlasí znovu. */
         const val CONSENT_VERSION = 4
+        /** Na co mám nárok (zapnuto / vypnuto přes Care.enabled). */
+        const val BENEFITS = "na"
         private const val DAY = 24L * 3600 * 1000
     }
 }

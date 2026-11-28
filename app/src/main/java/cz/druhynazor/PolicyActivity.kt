@@ -87,7 +87,7 @@ class PolicyActivity : Activity() {
                 "Hlášení můžete vypnout v části Pro rodinu, vypínač Hlásit podvodníky do společného seznamu.\n\n" +
                 "Jednou za hodinu si telefon seznam stahuje z GitHubu. GitHub přitom vidí IP adresu telefonu.",
 
-            "6. Fotky a vzkazy od rodiny (Od rodiny)" to
+            "6. Fotky a vzkazy od rodiny, počasí" to
                 "Co: fotky, hlasové a psané vzkazy, které vám pošle rodina přes svůj odkaz, jméno toho, kdo je poslal, " +
                 "a jestli jste je viděli nebo poslali srdíčko. Dále jména lidí z rodiny a to, jak vám říkají (třeba Babička). " +
                 "Vaše telefonní číslo ani čísla rodiny se na server neposílají.\n" +
@@ -95,7 +95,11 @@ class PolicyActivity : Activity() {
                 "Proč: aby vám rodina mohla posílat fotky a vzkazy.\n" +
                 "Jak dlouho: 30 dní, pak se samy smažou, na serveru i v telefonu. Ve schránce je nejvýš 40 věcí.\n" +
                 "Právní důvod: váš souhlas (čl. 6 odst. 1 písm. a) GDPR).\n\n" +
-                "Vypnout jde v části Pro rodinu, vypínač Zapnout Od rodiny.",
+                "Vypnout jde v části Pro rodinu, vypínač Zapnout Od rodiny." +
+                "\n\nPočasí: pro předpověď se posílá jen přibližné místo (zaokrouhlené asi na 1 km) nebo název obce, " +
+                "kterou zadala rodina, službě Open-Meteo. Jméno ani číslo se neposílá. Vypnout jde vypínačem Hlásit počasí.\n" +
+                "Hádanka dne, Na co mám nárok a Rádio nic nikam neposílají (Rádio jen otevře aplikaci Českého rozhlasu, " +
+                "Na co mám nárok pošle rodině SMS, jen když ťuknete na Poslat rodině).",
 
             "7. Číslo v seznamu omylem" to
                 "Pokud se vaše číslo dostalo do seznamu podvodníků omylem, napište na [doplníme: e-mail]. " +
