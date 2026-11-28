@@ -56,8 +56,10 @@ object Family {
      * SMS všem z rodiny (kromě except). Do seznamu zpráv seniora se neukládá.
      * done (volitelně) dostane true, když telefon potvrdí odeslání všem, false při chybě
      * (není signál, chybí kredit, telefon SMS odmítl). Přijde na hlavním vlákně.
+     * quick = true pro tlačítka na obrazovce: síť někdy potvrdí odeslání až po minutě, tak když telefon
+     * do 3 vteřin nehlásí chybu, done(true) přijde hned. Kdyby SMS nakonec neodešla, ukáže se upozornění.
      */
-    fun sms(context: Context, text: String, except: String? = null, maxParts: Int = 1, done: ((Boolean) -> Unit)? = null) {
+    fun sms(context: Context, text: String, except: String? = null, maxParts: Int = 1, quick: Boolean = false, done: ((Boolean) -> Unit)? = null) {
         val prefs = Prefs(context)
         val skip = except?.let { Prefs.normalize(it) }
         val targets = prefs.familyContacts.filter { skip == null || Prefs.normalize(it.phone) != skip }
@@ -65,7 +67,7 @@ object Family {
         var left = targets.size
         var allOk = true
         for (c in targets) {
-            sendSms(context, c.phone, text, maxParts) { ok ->
+            sendSms(context, c.phone, text, maxParts, quick) { ok ->
                 if (!ok) allOk = false
                 if (--left == 0) done?.invoke(allOk)
             }
@@ -116,7 +118,7 @@ object Family {
      * Jedna SMS. Text se převede bez háčků a zkrátí na maxParts placených částí (běžně jedna).
      * result (volitelně): true = telefon potvrdil odeslání všech částí.
      */
-    fun sendSms(context: Context, phone: String, text: String, maxParts: Int = 1, result: ((Boolean) -> Unit)? = null) {
+    fun sendSms(context: Context, phone: String, text: String, maxParts: Int = 1, quick: Boolean = false, result: ((Boolean) -> Unit)? = null) {
         val app = context.applicationContext
         val main = Handler(Looper.getMainLooper())
         try {
@@ -133,6 +135,7 @@ object Family {
             var left = parts.size
             var ok = true
             var finished = false
+            var reported = false
             lateinit var receiver: BroadcastReceiver
             fun finish(success: Boolean) {
                 if (finished) return
@@ -140,7 +143,11 @@ object Family {
                 try { app.unregisterReceiver(receiver) } catch (_: Exception) { }
                 Log.i("DruhyNazor", if (success) "SMS rodině odeslána (${parts.size} částí)" else "SMS rodině NEODEŠLA")
                 if (success) lastProblem = null else if (lastProblem == null) lastProblem = "telefon do 2 minut nepotvrdil odeslání"
-                result?.invoke(success)
+                if (!reported) { reported = true; result?.invoke(success) }
+                else if (!success) {
+                    // Už jsme řekli „odesláno“, ale síť SMS odmítla: aspoň upozornit
+                    android.widget.Toast.makeText(app, "Pozor: SMS rodině nakonec neodešla. Je na kartě kredit a signál?", android.widget.Toast.LENGTH_LONG).show()
+                }
             }
             receiver = object : BroadcastReceiver() {
                 override fun onReceive(c: Context, i: Intent) {
@@ -165,6 +172,8 @@ object Family {
             lastProblem = null
             sm.sendMultipartTextMessage(number, null, parts, sent, null)
             count(app, parts.size)
+            // Tlačítko na obrazovce nemá čekat na pomalé potvrzení sítě
+            if (quick) main.postDelayed({ if (!finished && ok && !reported) { reported = true; result?.invoke(true) } }, 3_000)
             // Když telefon do 2 minut nic neřekne, bereme to jako neodeslané
             main.postDelayed({ finish(false) }, 120_000)
         } catch (e: SecurityException) {

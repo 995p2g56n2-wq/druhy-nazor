@@ -88,11 +88,11 @@ class PolicyActivity : Activity() {
                 "Jednou za hodinu si telefon seznam stahuje z GitHubu. GitHub přitom vidí IP adresu telefonu.",
 
             "6. Fotky a vzkazy od rodiny, počasí" to
-                "Co: fotky, hlasové a psané vzkazy, které vám pošle rodina přes svůj odkaz, jméno toho, kdo je poslal, " +
+                "Co: fotky, krátká videa, hlasové a psané vzkazy, které vám pošle rodina přes svůj odkaz, jméno toho, kdo je poslal, " +
                 "a jestli jste je viděli nebo poslali srdíčko. Dále jména lidí z rodiny a to, jak vám říkají (třeba Babička). " +
                 "Vaše telefonní číslo ani čísla rodiny se na server neposílají.\n" +
                 "Komu: na náš server u Cloudflare (Cloudflare Inc., USA). Vidí to jen lidé z rodiny, kteří mají odkaz.\n" +
-                "Proč: aby vám rodina mohla posílat fotky a vzkazy.\n" +
+                "Proč: aby vám rodina mohla posílat fotky, videa a vzkazy.\n" +
                 "Jak dlouho: 30 dní, pak se samy smažou, na serveru i v telefonu. Ve schránce je nejvýš 40 věcí.\n" +
                 "Právní důvod: váš souhlas (čl. 6 odst. 1 písm. a) GDPR).\n\n" +
                 "Vypnout jde v části Pro rodinu, vypínač Zapnout Od rodiny." +

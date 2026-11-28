@@ -10,6 +10,7 @@ import android.view.Gravity
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.VideoView
 import cz.druhynazor.Ui.dp
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -23,6 +24,7 @@ class FamilyMailActivity : Activity() {
 
     private lateinit var speaker: Speaker
     private var player: MediaPlayer? = null
+    private var videoView: VideoView? = null
     private var currentId: String? = null
     private var album = false
 
@@ -52,6 +54,7 @@ class FamilyMailActivity : Activity() {
         super.onPause()
         speaker.stop()
         player?.pause()
+        videoView?.pause()
     }
 
     override fun onDestroy() {
@@ -66,7 +69,10 @@ class FamilyMailActivity : Activity() {
         else { @Suppress("DEPRECATION") super.onBackPressed() }
     }
 
-    private fun stopPlayer() { player?.release(); player = null }
+    private fun stopPlayer() {
+        player?.release(); player = null
+        videoView?.stopPlayback(); videoView = null
+    }
 
     private fun render(speak: Boolean, keep: Boolean = false) {
         val root = Ui.column(this, 20, 16).apply { setBackgroundColor(Ui.BG) }
@@ -82,6 +88,7 @@ class FamilyMailActivity : Activity() {
         val heading = when {
             item.isPhoto -> "📷 Fotka"
             item.isVoice -> "🎤 Hlasový vzkaz"
+            item.isVideo -> "🎬 Video"
             else -> "✍️ Vzkaz"
         }
         root.addView(Ui.text(this, heading, 30f, bold = true, center = true))
@@ -97,6 +104,25 @@ class FamilyMailActivity : Activity() {
                     scaleType = ImageView.ScaleType.FIT_CENTER
                 }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
             } else root.addView(Ui.text(this, "Fotku se nepodařilo otevřít.", 20f, center = true, color = Ui.WARN))
+        }
+        if (item.isVideo) {
+            val f = FamilyMail.file(this, item.id)
+            if (f.exists()) {
+                stopPlayer()
+                val v = VideoView(this).apply {
+                    setVideoPath(f.path)
+                    setOnPreparedListener { mp -> mp.isLooping = false }
+                    setOnErrorListener { _, _, _ ->
+                        speaker.say("Video se nepodařilo přehrát."); true
+                    }
+                    setOnClickListener { if (isPlaying) pause() else start() }
+                }
+                videoView = v
+                // Výška podle šířky displeje (16:9 se vejde, na výšku natočené se zmenší)
+                val h = (resources.displayMetrics.heightPixels * 0.55).toInt()
+                root.addView(v, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, h).apply { gravity = Gravity.CENTER })
+                root.addView(Ui.button(this, "▶  Pustit znovu", sp = 26f) { speaker.stop(); v.seekTo(0); v.start() }.apply { minHeight = dp(110) })
+            } else root.addView(Ui.text(this, "Video se nepodařilo otevřít.", 20f, center = true, color = Ui.WARN))
         }
         if (item.caption.isNotBlank()) {
             val card = Ui.card(this)
@@ -137,11 +163,15 @@ class FamilyMailActivity : Activity() {
             val what = when {
                 item.isPhoto -> "Fotka. Posílá ${item.from}. ${item.caption}"
                 item.isVoice -> "Hlasový vzkaz. Posílá ${item.from}."
+                item.isVideo -> "Video. Posílá ${item.from}. ${item.caption}"
                 else -> "Vzkaz. Posílá ${item.from}. ${item.caption}"
             }
             speaker.say(what)
             // Hlas rodiny pustit až po krátkém ohlášení
             if (item.isVoice) window.decorView.postDelayed({ if (!isFinishing && currentId == item.id && !album) play(item) }, 3000)
+            if (item.isVideo) window.decorView.postDelayed({
+                if (!isFinishing && currentId == item.id && !album) { speaker.stop(); videoView?.start() }
+            }, 3000 + item.caption.length * 60L)
         }
     }
 
@@ -220,7 +250,7 @@ class FamilyMailActivity : Activity() {
             if (b != null) thumb.setImageBitmap(b)
             row.addView(thumb, LinearLayout.LayoutParams(dp(90), dp(90)).apply { marginEnd = dp(12) })
         } else {
-            row.addView(Ui.text(this, if (item.isVoice) "🎤" else "✍️", 44f), LinearLayout.LayoutParams(dp(90), LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(12) })
+            row.addView(Ui.text(this, when { item.isVoice -> "🎤"; item.isVideo -> "🎬"; else -> "✍️" }, 44f), LinearLayout.LayoutParams(dp(90), LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(12) })
         }
         val label = (if (item.seen) "" else "🔴 Nové\n") + item.from + "\n" + day(item.time)
         row.addView(Ui.text(this, label, 20f, bold = !item.seen), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))

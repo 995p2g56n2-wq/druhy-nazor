@@ -99,7 +99,7 @@ class BenefitsActivity : Activity() {
             root.addView(Ui.text(this, ask, 22f, center = true))
             speaker.say(found.joinToString(" ") + " " + ask)
             if (prefs.familyContacts.isNotEmpty() && canSms()) {
-                root.addView(Ui.button(this, "📨  Poslat rodině", Ui.OK, sp = 26f) { sendFamily() }.apply { minHeight = dp(96) })
+                root.addView(Ui.button(this, "📨  Poslat rodině", Ui.OK, sp = 26f) { sendFamily(it as android.widget.Button) }.apply { minHeight = dp(96) })
             }
             root.addView(Ui.button(this, "📞  Úřad práce, zdarma: 800 779 900", Ui.CARD, Ui.ACCENT, sp = 20f) {
                 try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:800779900"))) } catch (_: Exception) { }
@@ -112,15 +112,22 @@ class BenefitsActivity : Activity() {
 
     private fun canSms() = checkSelfPermission(android.Manifest.permission.SEND_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-    private fun sendFamily() {
+    private fun sendFamily(button: android.widget.Button) {
+        if (!button.isEnabled) return
+        button.isEnabled = false
+        button.text = "⏳  Posílám…"
+        speaker.say("Posílám rodině.")
         val who = Prefs(this).seniorName
         val parts = mutableListOf<String>()
         if (housing()) parts += "mozna ma narok na pomoc s bydlenim (superdavka), spocitejte: mpsv.gov.cz/dssp-kalkulacka"
         if (care()) parts += "mozna ma narok na prispevek na peci, Urad prace 800 779 900"
         val text = "Postarano: $who " + parts.joinToString(", a ") + ". Zkuste to spolu."
-        Family.sms(this, text, maxParts = 2) { ok ->
+        Family.sms(this, text, maxParts = 2, quick = true) { ok ->
+            if (isFinishing || isDestroyed) return@sms
+            button.text = if (ok) "✓  Odesláno rodině" else "📨  Poslat rodině znovu"
+            button.isEnabled = !ok
             Toast.makeText(this, if (ok) "Odesláno rodině." else "SMS neodešla. Je na kartě kredit?", Toast.LENGTH_LONG).show()
-            if (ok) speaker.say("Odesláno rodině.")
+            speaker.say(if (ok) "Odesláno rodině." else "SMS neodešla. Zkontrolujte kredit a signál.")
         }
     }
 }

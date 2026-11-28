@@ -1,5 +1,5 @@
 /**
- * Postaráno: Od rodiny. Fotky, hlasové a psané vzkazy od rodiny pro seniora.
+ * Postaráno: Od rodiny. Fotky, krátká videa, hlasové a psané vzkazy od rodiny pro seniora.
  *
  * Každý senior má svou schránku (Durable Object s malou databází SQLite). Schránku založí aplikace
  * v telefonu seniora a zapíše do ní lidi z rodiny. Každý člověk z rodiny dostane v SMS vlastní odkaz
@@ -21,11 +21,18 @@ const UCHOVAT = 30 * DEN;
 const MAX_POLOZEK = 40;
 const MAX_ZA_DEN = 40;
 const MAX_SOUBOR = 1_500_000;
+/** Video: v prohlížeči se zmenší (asi 1 Mb/s), originál smí mít nejvýš 20 MB. */
+const MAX_VIDEO = 20_000_000;
+/** Celá schránka nejvýš 300 MB, pak se mažou nejstarší věci. */
+const MAX_SCHRANKA = 300_000_000;
+/** SQLite v Durable Objectu unese v jednom řádku nejvýš 2 MB, větší soubory se ukládají po kusech. */
+const KUS = 1_900_000;
 const MAX_TEXT = 300;
 const ID = /^[A-Za-z0-9_-]{16,64}$/;
 
 const POVOLENE: Record<string, string[]> = {
   foto: ["image/jpeg", "image/png", "image/webp"],
+  video: ["video/webm", "video/mp4", "video/quicktime", "video/3gpp"],
   hlas: ["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/aac", "audio/x-m4a"],
 };
 
@@ -63,6 +70,9 @@ export class RodinnaSchranka extends DurableObject<RodinaEnv> {
     this.sql.exec(`CREATE TABLE IF NOT EXISTS polozka (
       seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE, od TEXT, druh TEXT, popis TEXT,
       mime TEXT, data BLOB, cas INTEGER, videno INTEGER DEFAULT 0, srdce INTEGER DEFAULT 0)`);
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS kus (id TEXT, n INTEGER, data BLOB, PRIMARY KEY (id, n))`);
+    // Starší schránky (0.41) sloupec velikost ještě nemají
+    try { this.sql.exec(`ALTER TABLE polozka ADD COLUMN velikost INTEGER DEFAULT 0`); } catch { /* už je */ }
   }
 
   private meta(k: string): string | null {
@@ -77,6 +87,13 @@ export class RodinnaSchranka extends DurableObject<RodinaEnv> {
   private uklid() {
     this.sql.exec(`DELETE FROM polozka WHERE cas < ?`, Date.now() - UCHOVAT);
     this.sql.exec(`DELETE FROM polozka WHERE seq NOT IN (SELECT seq FROM polozka ORDER BY seq DESC LIMIT ?)`, MAX_POLOZEK);
+    // Moc velká schránka: mazat od nejstarších
+    for (;;) {
+      const celkem = this.sql.exec<{ s: number | null }>(`SELECT SUM(velikost) AS s FROM polozka`).one().s ?? 0;
+      if (celkem <= MAX_SCHRANKA) break;
+      this.sql.exec(`DELETE FROM polozka WHERE seq = (SELECT MIN(seq) FROM polozka)`);
+    }
+    this.sql.exec(`DELETE FROM kus WHERE id NOT IN (SELECT id FROM polozka)`);
   }
 
   /** Aplikace seniora: ověřit klíč ke čtení. Při prvním použití se klíč uloží. */
@@ -110,8 +127,15 @@ export class RodinnaSchranka extends DurableObject<RodinaEnv> {
     const zaDen = this.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM polozka WHERE cas > ?`, Date.now() - DEN).one().n;
     if (zaDen >= MAX_ZA_DEN) return "";
     const id = nahodne();
-    this.sql.exec(`INSERT INTO polozka (id, od, druh, popis, mime, data, cas) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      id, od, druh, popis, mime, data, Date.now());
+    const velikost = data?.byteLength ?? 0;
+    const poKusech = velikost > KUS;
+    this.sql.exec(`INSERT INTO polozka (id, od, druh, popis, mime, data, cas, velikost) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, od, druh, popis, mime, poKusech ? null : data, Date.now(), velikost);
+    if (poKusech && data) {
+      for (let n = 0; n * KUS < velikost; n++) {
+        this.sql.exec(`INSERT INTO kus (id, n, data) VALUES (?, ?, ?)`, id, n, data.slice(n * KUS, (n + 1) * KUS));
+      }
+    }
     this.uklid();
     return id;
   }
@@ -131,8 +155,14 @@ export class RodinnaSchranka extends DurableObject<RodinaEnv> {
 
   async soubor(id: string): Promise<{ mime: string; data: ArrayBuffer } | null> {
     const r = this.sql.exec<{ mime: string; data: ArrayBuffer | null }>(`SELECT mime, data FROM polozka WHERE id = ?`, id).toArray();
-    if (!r.length || !r[0].data) return null;
-    return { mime: r[0].mime, data: r[0].data };
+    if (!r.length) return null;
+    if (r[0].data) return { mime: r[0].mime, data: r[0].data };
+    const kusy = this.sql.exec<{ data: ArrayBuffer }>(`SELECT data FROM kus WHERE id = ? ORDER BY n`, id).toArray();
+    if (!kusy.length) return null;
+    const vse = new Uint8Array(kusy.reduce((a, k) => a + k.data.byteLength, 0));
+    let o = 0;
+    for (const k of kusy) { vse.set(new Uint8Array(k.data), o); o += k.data.byteLength; }
+    return { mime: r[0].mime, data: vse.buffer };
   }
 
   async videno(id: string, srdce: boolean): Promise<void> {
@@ -196,7 +226,11 @@ export async function rodina(req: Request, env: RodinaEnv): Promise<Response | n
   }
 
   if (!akce && req.method === "GET") {
-    const html = STRANKA.replaceAll("{{SENIOR}}", esc(kdo.senior || "váš blízký")).replaceAll("{{JMENO}}", esc(kdo.jmeno));
+    // Jména se neskloňují automaticky (Stanik → Staníku by často vyšlo špatně). Známá oslovení z aplikace
+    // mají 2. pád napevno, jinak věta bez jména.
+    const gen = GENITIV[kdo.senior];
+    const nadpis = gen ? "Na telefon " + gen : "Od rodiny";
+    const html = STRANKA.replaceAll("{{NADPIS}}", esc(nadpis));
     return new Response(html, {
       headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer" },
     });
@@ -207,19 +241,19 @@ export async function rodina(req: Request, env: RodinaEnv): Promise<Response | n
   }
   if (akce === "/poslat" && req.method === "POST") {
     const delka = Number(req.headers.get("content-length") ?? "0");
-    if (delka > MAX_SOUBOR + 20_000) return json({ ok: false, chyba: "velke" }, 413);
+    if (delka > MAX_VIDEO + 20_000) return json({ ok: false, chyba: "velke" }, 413);
     let form: FormData;
     try { form = await req.formData(); } catch { return json({ ok: false, chyba: "spatny-dotaz" }, 400); }
     const druh = String(form.get("druh") ?? "");
     const popis = String(form.get("popis") ?? "").trim().slice(0, MAX_TEXT);
     let mime = "text/plain";
     let data: ArrayBuffer | null = null;
-    if (druh === "foto" || druh === "hlas") {
+    if (druh === "foto" || druh === "hlas" || druh === "video") {
       const f = form.get("soubor");
       if (!f || typeof f === "string") return json({ ok: false, chyba: "chybi-soubor" }, 400);
       mime = (f.type || "").split(";")[0].toLowerCase();
       if (!POVOLENE[druh].includes(mime)) return json({ ok: false, chyba: "typ" }, 415);
-      if (f.size > MAX_SOUBOR) return json({ ok: false, chyba: "velke" }, 413);
+      if (f.size > (druh === "video" ? MAX_VIDEO : MAX_SOUBOR)) return json({ ok: false, chyba: "velke" }, 413);
       data = await f.arrayBuffer();
     } else if (druh === "text") {
       if (!popis) return json({ ok: false, chyba: "prazdne" }, 400);
@@ -230,6 +264,11 @@ export async function rodina(req: Request, env: RodinaEnv): Promise<Response | n
   }
   return json({ ok: false, chyba: "neznama-adresa" }, 404);
 }
+
+/** Oslovení, která nabízí aplikace (Prefs.CALLS), ve 2. pádě: „na telefon mamky“. */
+const GENITIV: Record<string, string> = {
+  "Mamka": "mamky", "Taťka": "taťky", "Babička": "babičky", "Děda": "dědy", "Váš blízký": "vašeho blízkého",
+};
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -244,18 +283,37 @@ main{max-width:560px;margin:0 auto;padding:20px 16px 48px}h1{font-size:28px;marg
 button,.btn{display:block;width:100%;border:0;border-radius:14px;padding:16px;font:700 20px system-ui,sans-serif;background:var(--accent);color:#fff;cursor:pointer;text-align:center;margin-top:10px}
 button.sec{background:transparent;color:var(--accent);border:2px solid var(--accent)}button.rec{background:var(--bad)}
 button:disabled{opacity:.5}textarea,input[type=text]{width:100%;font:18px system-ui,sans-serif;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
-img.nahled{max-width:100%;border-radius:12px;margin-top:10px}audio{width:100%;margin-top:10px}
+video.nahled{width:100%;max-height:360px;background:#000}img.nahled{max-width:100%;border-radius:12px;margin-top:10px}audio{width:100%;margin-top:10px}
 .stav{font-weight:700;margin-top:10px}.ok{color:var(--ok)}.chyba{color:var(--bad)}
-li{margin:8px 0;list-style:none}ul{padding:0;margin:0}input[type=file]{display:none}`;
+li{margin:8px 0;list-style:none}ul{padding:0;margin:0}ol{padding-left:22px;margin:6px 0}ol li{list-style:decimal;margin:4px 0}
+summary{cursor:pointer;font-size:19px}details[open] summary{margin-bottom:8px}input[type=file]{display:none}`;
 
 const STRANKA_NEPLATNA = `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Postaráno – Od rodiny</title><style>${STYL}</style></head><body><main><h1>Odkaz už neplatí</h1>
 <p>Tento odkaz nefunguje. Na telefonu seniora otevřete Postaráno, Pro rodinu, a v části Od rodiny ťukněte na Poslat odkaz znovu.</p></main></body></html>`;
 
 const STRANKA = `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex"><title>Postaráno – Od rodiny</title><style>${STYL}</style></head><body><main>
-<h1>Pro: {{SENIOR}}</h1>
-<p>Dobrý den, {{JMENO}}. Co sem pošlete, ukáže se na telefonu přes celou obrazovku a přečte se nahlas. Odpovědět může srdíčkem nebo vám zavolá.</p>
+<meta name="robots" content="noindex"><title>Od rodiny</title><style>${STYL}</style></head><body><main>
+<h1>{{NADPIS}}</h1>
+<p>Dobrý den. Co sem pošlete, ukáže se na telefonu přes celou obrazovku a přečte se nahlas. Odpovědět může srdíčkem nebo vám zavolá.</p>
+
+<details class="card" id="ulozit">
+  <summary><b>📌 Jak si tuhle stránku uložit</b> (ťukněte)</summary>
+  <p class="muted">Ať ji příště nemusíte hledat v SMS. Stačí jednou.</p>
+  <p><b>Android (Chrome):</b></p>
+  <ol>
+    <li>Vpravo nahoře ťukněte na tři tečky <b>⋮</b>.</li>
+    <li>Ťukněte na <b>Přidat na plochu</b> (někde <b>Přidat na úvodní obrazovku</b>).</li>
+    <li>Ťukněte na <b>Přidat</b>. Na ploše vám přibude ikona „Od rodiny“.</li>
+  </ol>
+  <p><b>iPhone (Safari):</b></p>
+  <ol>
+    <li>Dole ťukněte na tlačítko <b>Sdílet</b> (čtvereček se šipkou nahoru).</li>
+    <li>Sjeďte níž a ťukněte na <b>Přidat na plochu</b>.</li>
+    <li>Vpravo nahoře ťukněte na <b>Přidat</b>.</li>
+  </ol>
+  <p class="muted">Když to nejde, uložte si SMS s odkazem nebo si stránku dejte do záložek. Odkaz je jen váš, neposílejte ho dál.</p>
+</details>
 
 <div class="card">
   <h2>📷 Fotka</h2>
@@ -266,6 +324,17 @@ const STRANKA = `<!doctype html><html lang="cs"><head><meta charset="utf-8"><met
   <input type="text" id="fotoPopis" maxlength="300" placeholder="Třeba: Tady je Anička na výletě">
   <button id="fotoPoslat" disabled>Poslat fotku</button>
   <p id="fotoStav" class="stav"></p>
+</div>
+
+<div class="card">
+  <h2>🎬 Video</h2>
+  <p class="muted">Krátké video, nejvýš 1 minuta. Delší video se pošle jen jeho první minuta.</p>
+  <label class="btn" for="video">Natočit nebo vybrat video</label>
+  <input type="file" id="video" accept="video/*">
+  <video id="videoNahled" class="nahled" controls playsinline hidden></video>
+  <input type="text" id="videoPopis" maxlength="300" placeholder="Můžete připsat pár slov">
+  <button id="videoPoslat" disabled>Poslat video</button>
+  <p id="videoStav" class="stav"></p>
 </div>
 
 <div class="card">
@@ -295,8 +364,8 @@ const STRANKA = `<!doctype html><html lang="cs"><head><meta charset="utf-8"><met
 const zaklad = location.pathname.replace(/\\/$/, "");
 const $ = (id) => document.getElementById(id);
 function stav(el, text, ok) { el.textContent = text; el.className = "stav " + (ok ? "ok" : "chyba"); }
-async function poslat(fd, el, tlacitko) {
-  tlacitko.disabled = true; stav(el, "Posílám…", true);
+async function poslat(fd, el, tlacitko, zprava) {
+  tlacitko.disabled = true; stav(el, zprava || "Posílám…", true);
   try {
     const r = await fetch(zaklad + "/poslat", { method: "POST", body: fd });
     const j = await r.json().catch(() => ({}));
@@ -327,6 +396,93 @@ $("fotoPoslat").addEventListener("click", async () => {
   if (!fotka) return;
   const fd = new FormData(); fd.append("druh", "foto"); fd.append("popis", $("fotoPopis").value); fd.append("soubor", fotka, "fotka.jpg");
   if (await poslat(fd, $("fotoStav"), $("fotoPoslat"))) { fotka = null; $("nahled").hidden = true; $("fotoPopis").value = ""; $("foto").value = ""; }
+});
+
+// Video: velké nebo dlouhé video se v telefonu zmenší (asi 1 Mb/s, nejvýš 1280 bodů), ať se vejde a posílá rychle
+const VIDEO_MAX = 20000000, VIDEO_RYCHLE = 6000000, VIDEO_DELKA = 60;
+const VIDEO_TYPY = ["video/webm", "video/mp4", "video/quicktime", "video/3gpp"];
+let video = null, videoDelka = 0;
+function delkaVidea(url) {
+  return new Promise((ok) => {
+    const v = document.createElement("video"); v.preload = "metadata"; v.muted = true;
+    v.onloadedmetadata = () => ok(isFinite(v.duration) ? v.duration : 0);
+    v.onerror = () => ok(-1); v.src = url;
+  });
+}
+function umiZmensit() {
+  return !!(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream && (window.AudioContext || window.webkitAudioContext));
+}
+async function zmensit(soubor, el) {
+  const url = URL.createObjectURL(soubor);
+  const v = document.createElement("video"); v.playsInline = true; v.src = url;
+  await new Promise((ok, chyba) => { v.onloadedmetadata = ok; v.onerror = chyba; });
+  const k = Math.min(1, 1280 / Math.max(v.videoWidth || 1280, v.videoHeight || 720));
+  const c = document.createElement("canvas");
+  c.width = Math.round((v.videoWidth || 1280) * k / 2) * 2; c.height = Math.round((v.videoHeight || 720) * k / 2) * 2;
+  const g = c.getContext("2d");
+  const proud = c.captureStream(30);
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  try {
+    const zdroj = ctx.createMediaElementSource(v), cil = ctx.createMediaStreamDestination();
+    zdroj.connect(cil); // do reproduktoru ne, zmenšuje se potichu
+    cil.stream.getAudioTracks().forEach((t) => proud.addTrack(t));
+  } catch (e) { }
+  const typ = ["video/webm;codecs=vp8,opus", "video/webm", "video/mp4;codecs=avc1,mp4a", "video/mp4"].find((t) => MediaRecorder.isTypeSupported(t)) || "";
+  const r = new MediaRecorder(proud, Object.assign({ videoBitsPerSecond: 1000000, audioBitsPerSecond: 64000 }, typ ? { mimeType: typ } : {}));
+  const casti = [];
+  r.ondataavailable = (e) => { if (e.data.size) casti.push(e.data); };
+  const hotovo = new Promise((ok) => { r.onstop = ok; });
+  const konec = Math.min(v.duration || VIDEO_DELKA, VIDEO_DELKA);
+  let bezi = true;
+  const kresli = () => {
+    if (!bezi) return;
+    g.drawImage(v, 0, 0, c.width, c.height);
+    stav(el, "Zmenšuji video… " + Math.min(100, Math.round(100 * v.currentTime / konec)) + " %", true);
+    if (v.currentTime >= konec || v.ended) { bezi = false; v.pause(); r.state === "recording" && r.stop(); return; }
+    requestAnimationFrame(kresli);
+  };
+  v.onended = () => { if (bezi) { bezi = false; r.state === "recording" && r.stop(); } };
+  await ctx.resume().catch(() => {});
+  r.start(1000);
+  await v.play();
+  kresli();
+  await hotovo;
+  ctx.close().catch(() => {}); URL.revokeObjectURL(url);
+  return new Blob(casti, { type: (r.mimeType || typ || "video/webm").split(";")[0] });
+}
+$("video").addEventListener("change", async () => {
+  const f = $("video").files[0]; if (!f) return;
+  video = f; $("videoPoslat").disabled = true;
+  const url = URL.createObjectURL(f);
+  videoDelka = await delkaVidea(url);
+  $("videoNahled").src = url; $("videoNahled").hidden = false;
+  const typOk = VIDEO_TYPY.includes((f.type || "").split(";")[0].toLowerCase());
+  const potrebaZmensit = f.size > VIDEO_RYCHLE || videoDelka > VIDEO_DELKA + 2 || !typOk;
+  if (potrebaZmensit && !umiZmensit() && (f.size > VIDEO_MAX || !typOk)) {
+    video = null; stav($("videoStav"), "Video je moc velké a tento prohlížeč ho neumí zmenšit. Zkuste kratší video nebo prohlížeč Chrome.", false); return;
+  }
+  $("videoPoslat").disabled = false;
+  stav($("videoStav"), potrebaZmensit && umiZmensit() ? "Po ťuknutí na Poslat se video nejdřív zmenší, chvilku to potrvá. Nechte stránku otevřenou." : "", true);
+});
+$("videoPoslat").addEventListener("click", async () => {
+  if (!video) return;
+  const b = $("videoPoslat"); b.disabled = true;
+  let soubor = video, jmeno = video.name || "video";
+  const typOk = VIDEO_TYPY.includes((video.type || "").split(";")[0].toLowerCase());
+  if ((video.size > VIDEO_RYCHLE || videoDelka > VIDEO_DELKA + 2 || !typOk) && umiZmensit()) {
+    try {
+      $("videoNahled").pause();
+      soubor = await zmensit(video, $("videoStav"));
+      jmeno = "video." + (soubor.type.includes("mp4") ? "mp4" : "webm");
+    } catch (e) {
+      if (video.size > VIDEO_MAX || !typOk) { stav($("videoStav"), "Video se nepodařilo zmenšit. Zkuste kratší video.", false); b.disabled = false; return; }
+      soubor = video;
+    }
+  }
+  if (soubor.size > VIDEO_MAX) { stav($("videoStav"), "Video je i po zmenšení moc velké. Zkuste kratší.", false); b.disabled = false; return; }
+  const fd = new FormData(); fd.append("druh", "video"); fd.append("popis", $("videoPopis").value); fd.append("soubor", soubor, jmeno);
+  if (await poslat(fd, $("videoStav"), b, "Posílám video… může to trvat i minutu.")) { video = null; $("videoNahled").pause(); $("videoNahled").hidden = true; $("videoPopis").value = ""; $("video").value = ""; }
 });
 
 // Hlas
@@ -372,7 +528,7 @@ async function nacist() {
     if (!j.polozky.length) { ul.innerHTML = '<li class="muted">Zatím nic.</li>'; return; }
     for (const p of j.polozky) {
       const li = document.createElement("li");
-      const co = { foto: "📷 Fotka", hlas: "🎤 Hlasový vzkaz", text: "✍️ Vzkaz" }[p.druh] || p.druh;
+      const co = { foto: "📷 Fotka", video: "🎬 Video", hlas: "🎤 Hlasový vzkaz", text: "✍️ Vzkaz" }[p.druh] || p.druh;
       li.textContent = co + " · " + p.od + " · " + kdy(p.cas) + " · " + (p.videno ? "viděno ✓" : "zatím neviděno") + (p.srdce ? " · ❤️ srdíčko" : "");
       ul.appendChild(li);
     }

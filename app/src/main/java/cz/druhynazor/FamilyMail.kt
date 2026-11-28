@@ -25,6 +25,7 @@ data class MailItem(
 ) {
     val isPhoto get() = kind == "foto"
     val isVoice get() = kind == "hlas"
+    val isVideo get() = kind == "video"
 }
 
 /**
@@ -165,13 +166,16 @@ object FamilyMail {
                 val id = o.getString("id")
                 val kind = o.getString("druh")
                 if (list.any { it.id == id }) { last = maxOf(last, o.getLong("seq")); continue }
-                if (kind == "foto" || kind == "hlas") {
+                if (kind == "foto" || kind == "hlas" || kind == "video") {
                     val c = call(ctx, "GET", "/rodina/soubor?id=$id")
                     try {
                         if (c.responseCode != 200) { Log.w("DruhyNazor", "Od rodiny: soubor $id ${c.responseCode}"); break }
                         val f = file(ctx, id)
                         f.parentFile?.mkdirs()
-                        c.inputStream.use { inp -> f.outputStream().use { inp.copyTo(it) } }
+                        // Nejdřív do dočasného souboru, ať po přerušeném stahování nezůstane půlka videa
+                        val tmp = java.io.File(f.path + ".part")
+                        c.inputStream.use { inp -> tmp.outputStream().use { inp.copyTo(it) } }
+                        if (!tmp.renameTo(f)) { tmp.delete(); break }
                     } finally { c.disconnect() }
                 }
                 list += MailItem(id, o.getString("od"), kind, o.optString("popis"), o.optString("mime"), o.getLong("cas"), false, false)
@@ -204,7 +208,10 @@ object FamilyMail {
 
     fun smsText(ctx: Context, c: FamilyContact): String {
         // Bez háčků se to vejde do jedné SMS i s odkazem (SmsText.clean je stejně odstraní)
-        return "Postarano: Fotky a vzkazy na telefon ${Prefs(ctx).seniorGenitive} posilejte sem: ${link(ctx, c)}"
+        val l = link(ctx, c)
+        val t = SmsText.clean("Postarano: fotky a videa na telefon ${Prefs(ctx).seniorGenitive} posilejte sem, ulozte si: $l")
+        // Dlouhé jméno by odkaz na konci uřízlo, pak raději bez jména
+        return if (t.length <= SmsText.limit(1)) t else "Postarano: fotky a videa posilejte sem, ulozte si: $l"
     }
 
     /** Poslat odkaz tomuto člověku znovu (Pro rodinu). */
@@ -214,7 +221,7 @@ object FamilyMail {
             Handler(Looper.getMainLooper()).post {
                 if (!ok) { done(false); return@post }
                 prefs(ctx).edit().putBoolean("poslano_" + Prefs.normalize(c.phone), true).apply()
-                Family.sendSms(ctx, c.phone, smsText(ctx, c)) { done(it) }
+                Family.sendSms(ctx, c.phone, smsText(ctx, c), quick = true) { done(it) }
             }
         }.start()
     }
@@ -267,6 +274,7 @@ object FamilyMail {
             list.size > 1 -> "Přišlo ${list.size} nových věcí od rodiny"
             first.isPhoto -> "Nová fotka: posílá ${first.from}"
             first.isVoice -> "Nový hlasový vzkaz: posílá ${first.from}"
+            first.isVideo -> "Nové video: posílá ${first.from}"
             else -> "Nový vzkaz: posílá ${first.from}"
         }
         val i = Intent(ctx, FamilyMailActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
