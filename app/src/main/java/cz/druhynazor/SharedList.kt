@@ -166,7 +166,7 @@ object SharedList {
         "gov.cz", "mojedatovaschranka.cz", "policie.cz", "cnb.cz", "coi.gov.cz", "csob.cz", "kb.cz", "csas.cz",
         "rb.cz", "airbank.cz", "fio.cz", "moneta.cz", "mbank.cz", "unicreditbank.cz", "creditas.cz",
         "ceskaposta.cz", "postaonline.cz", "zasilkovna.cz", "packeta.com", "ppl.cz", "dpd.cz", "gls-group.eu",
-        "alza.cz", "cez.cz", "o2.cz", "t-mobile.cz", "vodafone.cz", "idnes.cz", "novinky.cz", "ceskatelevize.cz"
+        "alza.cz", "cez.cz", "o2.cz", "t-mobile.cz", "vodafone.cz", "tescomobile.cz", "tesco.cz", "idnes.cz", "novinky.cz", "ceskatelevize.cz"
     )
 
     fun isProtected(host: String): Boolean =
