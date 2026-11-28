@@ -83,13 +83,13 @@ class ChatWatcher : NotificationListenerService() {
             Notify.show(this, id, Notify.CH_WARN, "⚠️ Pozor, podvod na $app",
                 "Od: $title. Na nic neklikejte a nic neposílejte. ${prefs.familyName} už o tom ví.", tap, Color.RED)
             Family.notify(this, "${prefs.seniorName}: podvodná zpráva na $app",
-                "Od: $title\n${result.reason}\n\nText: ${text.take(300)}",
+                "Od $title: ${text.take(300)}",
                 reviewKey = key)
         } else {
             Notify.show(this, id, Notify.CH_WARN, "⚠️ Podezřelá zpráva na $app",
                 "Od: $title. Zatím nic nedělejte, ptáme se: ${prefs.familyName}.", tap, Color.rgb(0xA8, 0x5D, 0x00))
-            Family.notify(this, "${prefs.seniorName}: podezřelá zpráva na $app, je v pořádku?",
-                "Od: $title\n${result.reason}\n\nText: ${text.take(300)}", urgent = false,
+            Family.notify(this, "${prefs.seniorName}: podezřelá zpráva na $app",
+                "Od $title: ${text.take(300)}", urgent = false,
                 reviewKey = key)
         }
     }

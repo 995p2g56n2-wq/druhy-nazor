@@ -238,7 +238,7 @@ class MainActivity : Activity() {
         // První SMS rodině: vysvětlení a zkouška. Jen jednou.
         if (family.isNotEmpty() && !prefs.testSent && canSms()) {
             prefs.testSent = true
-            Family.sms(this, FamilyUi.welcomeText(prefs) + " Toto je zkouška, teď nemusíte odpovídat.")
+            Family.sms(this, FamilyUi.welcomeText(prefs) + " Teď nemusíte odpovídat.", maxParts = 2)
         }
 
         root.setBackgroundColor(if (ok) Ui.OK_SOFT else Ui.WARN_SOFT)
@@ -346,7 +346,7 @@ class MainActivity : Activity() {
         if (now - prefs.setupAlertTime < DAY) return
         prefs.setupAlertTime = now
         Family.sms(this, "Postaráno: Na telefonu ${prefs.seniorGenitive} není ochrana celá zapnutá. " +
-            "Až u něj budete, otevřete Postaráno, ťukněte dole na Pro rodinu a pak na Dokončit nastavení.")
+            "Až tam budete: Postaráno, Pro rodinu, Dokončit nastavení.")
     }
 
     /** Nový pomocník Dopisy: rodina to jednou dostane v SMS, senior nemusí nic vysvětlovat. */
@@ -357,7 +357,7 @@ class MainActivity : Activity() {
         p.edit().putBoolean("ohlaseno", true).apply()
         Family.sms(this, "Postaráno: Na telefonu ${prefs.seniorGenitive} přibyl pomocník Dopisy. Na úvodní obrazovce je dlaždice Dopis: " +
             "stačí namířit telefon na dopis a aplikace nahlas řekne, o co jde, jestli to není podvod a co udělat. " +
-            "Tlačítkem Poslat rodině vám přijde SMS se shrnutím dopisu, fotku vám může poslat přes WhatsApp. Podezřelý dopis vám pošle sama.")
+            "Tlačítkem Poslat rodině vám přijde SMS se shrnutím dopisu, fotku vám může poslat přes WhatsApp. Podezřelý dopis vám pošle sama.", maxParts = 3)
     }
 
     @Deprecated("Activity API")

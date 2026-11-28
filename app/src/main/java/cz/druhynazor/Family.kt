@@ -28,8 +28,28 @@ object Family {
         val prefs = Prefs(context)
 
         val question = reviewKey?.let { Verdicts.smsQuestion(context, it) } ?: ""
-        val text = "Postaráno: $title\n${message.take(400)}" + if (question.isNotEmpty()) "\n\n$question" else ""
+        // Celé upozornění se musí vejít do jedné SMS (každá další část stojí kredit).
+        // Nadpis a otázka zůstanou celé, zkrátí se jen text zprávy uprostřed.
+        val head = SmsText.clean("Postaráno: $title")
+        val tail = SmsText.clean(question)
+        val room = SmsText.ONE_SMS - head.length - 1 - (if (tail.isNotEmpty()) tail.length + 1 else 0)
+        val body = SmsText.fit(SmsText.clean(message), room.coerceAtLeast(0))
+        val text = listOf(head, body, tail).filter { it.isNotEmpty() }.joinToString("\n")
         sms(context, text, done = done)
+    }
+
+    // ---------- Počítadlo SMS (aby rodina viděla, kolik to stojí kredit) ----------
+
+    private fun counter(context: Context) = context.applicationContext.getSharedPreferences("sms_pocet", Context.MODE_PRIVATE)
+    private fun monthKey() = java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).format(java.util.Date())
+
+    /** Kolik SMS (placených částí) odešlo rodině tento měsíc. */
+    fun sentThisMonth(context: Context): Int = counter(context).getInt("m_" + monthKey(), 0)
+
+    private fun count(context: Context, parts: Int) {
+        val p = counter(context)
+        val k = "m_" + monthKey()
+        p.edit().putInt(k, p.getInt(k, 0) + parts).apply()
     }
 
     /**
@@ -37,7 +57,7 @@ object Family {
      * done (volitelně) dostane true, když telefon potvrdí odeslání všem, false při chybě
      * (není signál, chybí kredit, telefon SMS odmítl). Přijde na hlavním vlákně.
      */
-    fun sms(context: Context, text: String, except: String? = null, done: ((Boolean) -> Unit)? = null) {
+    fun sms(context: Context, text: String, except: String? = null, maxParts: Int = 1, done: ((Boolean) -> Unit)? = null) {
         val prefs = Prefs(context)
         val skip = except?.let { Prefs.normalize(it) }
         val targets = prefs.familyContacts.filter { skip == null || Prefs.normalize(it.phone) != skip }
@@ -45,7 +65,7 @@ object Family {
         var left = targets.size
         var allOk = true
         for (c in targets) {
-            sendSms(context, c.phone, text) { ok ->
+            sendSms(context, c.phone, text, maxParts) { ok ->
                 if (!ok) allOk = false
                 if (--left == 0) done?.invoke(allOk)
             }
@@ -92,8 +112,11 @@ object Family {
     }
     private var counter = 0
 
-    /** Jedna SMS. result (volitelně): true = telefon potvrdil odeslání všech částí. */
-    fun sendSms(context: Context, phone: String, text: String, result: ((Boolean) -> Unit)? = null) {
+    /**
+     * Jedna SMS. Text se převede bez háčků a zkrátí na maxParts placených částí (běžně jedna).
+     * result (volitelně): true = telefon potvrdil odeslání všech částí.
+     */
+    fun sendSms(context: Context, phone: String, text: String, maxParts: Int = 1, result: ((Boolean) -> Unit)? = null) {
         val app = context.applicationContext
         val main = Handler(Looper.getMainLooper())
         try {
@@ -105,7 +128,7 @@ object Family {
                 main.post { result?.invoke(false) }
                 return
             }
-            val parts = sm.divideMessage(text)
+            val parts = sm.divideMessage(SmsText.fit(SmsText.clean(text), SmsText.limit(maxParts)))
             val id = "${System.currentTimeMillis()}-${counter++}"
             var left = parts.size
             var ok = true
@@ -141,6 +164,7 @@ object Family {
             }
             lastProblem = null
             sm.sendMultipartTextMessage(number, null, parts, sent, null)
+            count(app, parts.size)
             // Když telefon do 2 minut nic neřekne, bereme to jako neodeslané
             main.postDelayed({ finish(false) }, 120_000)
         } catch (e: SecurityException) {

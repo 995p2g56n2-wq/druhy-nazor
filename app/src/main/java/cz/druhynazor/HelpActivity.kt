@@ -139,23 +139,23 @@ object Help {
         val who = "${prefs.seniorName} ${Care.g(prefs, "zmáčkla", "zmáčkl")} tlačítko Pomoc a volá vám."
         val lm = app.getSystemService(LocationManager::class.java)
         if (!locationAllowed(app) || lm == null) {
-            Family.sms(app, "$head$who Polohu nevím, telefon ji nesmí zjistit.")
+            Family.sms(app, "$head$who Polohu nevím, telefon ji nesmí zjistit.", maxParts = 2)
             return
         }
         val last = lastKnown(app, lm)
         val now = System.currentTimeMillis()
         if (last != null && now - last.time < FRESH) {
-            Family.sms(app, "$head$who Je tady: ${where(last)}")
+            Family.sms(app, "$head$who Je tady: ${where(last)}", maxParts = 2)
             return
         }
         // Stará nebo žádná poloha: SMS hned, přesnou polohu pošleme, jakmile ji telefon najde
         val old = last?.let { " Naposledy ${minutesAgo(now - it.time)} byl telefon tady: ${link(it)}" } ?: ""
-        Family.sms(app, "$head$who Polohu ještě hledám, pošlu ji v další SMS.$old")
+        Family.sms(app, "$head$who Polohu ještě hledám, pošlu ji v další SMS.$old", maxParts = 2)
         current(app, lm) { loc ->
             val text = if (loc != null) "Postaráno: ${prefs.seniorName} je teď tady: ${where(loc)}"
                        else "Postaráno: Polohu ${prefs.seniorGenitive} se nepodařilo zjistit" +
                            if (!lm.isLocationEnabled) ", v telefonu je vypnutá poloha." else "."
-            Family.sms(app, if (test) "$text (zkouška)" else text)
+            Family.sms(app, if (test) "$text (zkouška)" else text, maxParts = 2)
         }
     }
 
