@@ -19,9 +19,8 @@ object Verdicts {
         val p = prefs(ctx)
         p.edit().remove("v_$TEST_KEY").remove("by_$TEST_KEY").apply()
         val senior = Prefs(ctx).seniorName
-        Family.notify(ctx, "Zkouška",
-            "Toto je jen zkouška, nic se neděje. Takhle vám přijde zpráva, když $senior dostane něco podezřelého. " +
-            "Odpovězte prosím, ať víme, že vaše odpověď dojde.", urgent = false, reviewKey = TEST_KEY, done = done)
+        Family.notify(ctx, "Zkouška, nic se neděje.",
+            "Takhle vám napíšu, když $senior dostane něco podezřelého.", urgent = false, reviewKey = TEST_KEY, done = done)
     }
 
     private fun prefs(ctx: Context) = ctx.applicationContext.getSharedPreferences("verdikty", Context.MODE_PRIVATE)
@@ -55,7 +54,7 @@ object Verdicts {
         if (ok && key.startsWith("s")) key.drop(1).toLongOrNull()?.let { SmsStore.byId(ctx, it) }
             ?.let { TrustedSenders.learn(ctx, it.address, it.body) }
         // Společný seznam: podvod nahlásit (aby varoval i ostatní), „v pořádku“ hlášení oslabí
-        val shared = SharedList.onVerdict(ctx, key, scam = !ok)
+        SharedList.onVerdict(ctx, key, scam = !ok)
         val who = byName ?: prefsMain.familyName
         val tap = Intent(ctx, DruhyNazorActivity::class.java)
             .putExtra(DruhyNazorActivity.EXTRA_ONLY_MESSAGES, true)
@@ -65,13 +64,9 @@ object Verdicts {
             if (ok) "Zpráva je v pořádku, můžete ji otevřít." else "Na nic neklikejte, nic neplaťte a na zprávu neodpovídejte.",
             tap, if (ok) Ui.OK else Color.RED)
 
-        val senior = prefsMain.seniorName
-        val result = if (ok) "$senior uvidí, že je zpráva v pořádku, a odkaz půjde otevřít."
-                     else "$senior uvidí, že je to potvrzený podvod." +
-                         if (shared) " Číslo a odkazy jsme nahlásili do společného seznamu, aby varovaly i ostatní rodiny." else ""
-        if (byNumber != null) {
-            Family.sendSms(ctx, byNumber, "Postaráno: Díky. $result")
-            Family.sms(ctx, "Postaráno: Vyřízeno. $who napsal(a): ${if (ok) "zpráva je v pořádku" else "je to podvod"}. Nemusíte nic dělat.", except = byNumber)
+        // Tomu, kdo odpověděl, už nic neposíláme (každá SMS stojí kredit). Ostatním z rodiny jen krátce, ať to neřeší dvakrát.
+        if (byNumber != null && prefsMain.familyContacts.size > 1) {
+            Family.sms(ctx, "Postaráno: Vyřízeno, $who napsal(a): ${if (ok) "v pořádku" else "podvod"}. Nemusíte nic dělat.", except = byNumber)
         }
         return true
     }
@@ -83,8 +78,7 @@ object Verdicts {
         val tap = Intent(ctx, DruhyNazorActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         Notify.show(ctx, 7999, Notify.CH_MSG, "✅ Zkouška vyšla",
             "$who odpověděl(a) $answer. Odpovědi rodiny fungují.", tap, Ui.OK)
-        val text = "Zkouška vyšla. Vaše odpověď $answer dorazila na telefon ${prefsMain.seniorGenitive}. " +
-            "Stejně budete odpovídat, až přijde opravdu podezřelá zpráva."
+        val text = "Zkouška vyšla, vaše odpověď $answer dorazila. Stejně odpovíte, až přijde opravdu podezřelá zpráva."
         if (byNumber != null) Family.sendSms(ctx, byNumber, "Postaráno: $text")
     }
 
@@ -95,7 +89,7 @@ object Verdicts {
         val p = prefs(ctx)
         val n = (p.getInt("next_n", 0) % 9) + 1
         p.edit().putInt("next_n", n).putString("p_$n", key).putLong("pt_$n", System.currentTimeMillis()).apply()
-        return "Je to v pořádku? Odpovězte ANO $n, nebo NE $n."
+        return "Odpovězte ANO $n = v pořádku, NE $n = podvod."
     }
 
     private val replyRegex = Regex("^\\s*(ano|ne)\\s*([1-9])?\\s*[.!]*\\s*$", RegexOption.IGNORE_CASE)

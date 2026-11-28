@@ -244,7 +244,7 @@ object Care {
                     p.edit().putLong("hlaseno_${med.id}", now).apply()
                     val prefsMain = Prefs(ctx)
                     Family.sms(ctx, "Postaráno: ${prefsMain.seniorName} zatím ${g(prefsMain, "nepotvrdila", "nepotvrdil")}, " +
-                        "že si ${g(prefsMain, "vzala", "vzal")} lék ${med.name} (v ${med.time}). Telefon to připomněl třikrát. " +
+                        "že si ${g(prefsMain, "vzala", "vzal")} lék ${med.name} (v ${med.time}). " +
                         "Zkuste ${g(prefsMain, "jí", "mu")} zavolat.")
                 }
             }
@@ -262,7 +262,7 @@ object Care {
                     p.edit().putLong("hlaseno_c", now).apply()
                     val prefsMain = Prefs(ctx)
                     Family.sms(ctx, "Postaráno: ${prefsMain.seniorName} dnes do ${deadlineTime(ctx)} ${g(prefsMain, "neodpověděla", "neodpověděl")} " +
-                        "na otázku Jak se máte. Telefon se ptal dvakrát. Zkuste ${g(prefsMain, "jí", "mu")} zavolat.")
+                        "na otázku Jak se máte. Zkuste ${g(prefsMain, "jí", "mu")} zavolat.")
                 }
             }
         }
@@ -278,7 +278,7 @@ object Care {
         Family.sms(ctx, "Postaráno: Na telefonu ${prefsMain.seniorGenitive} jsou na zkoušku 3 noví pomocníci. " +
             "Pomoc: červené tlačítko vám zavolá a pošle polohu. " +
             "Jsem v pořádku: v ${checkTime(ctx)} se zeptá, jak se má, a když do ${deadlineTime(ctx)} neodpoví, přijde vám SMS. " +
-            "Léky: připomene lék nahlas, když ho zadáte v Pro rodinu. Vypnout jde každý tamtéž.")
+            "Léky: připomene lék nahlas, když ho zadáte v Pro rodinu. Vypnout jde každý tamtéž.", maxParts = 3)
     }
 }
 

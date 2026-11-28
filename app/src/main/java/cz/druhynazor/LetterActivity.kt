@@ -455,7 +455,7 @@ class LetterActivity : Activity() {
         })
         if (prefs.familyContacts.isNotEmpty()) root.addView(Ui.button(this, "👨‍👩‍👧  Poslat rodině", Ui.CARD, Ui.INK) {
             speaker.say("Posílám to rodině.")
-            Family.sms(this, s.familyText) { ok ->
+            Family.sms(this, s.familyText, maxParts = 2) { ok ->
                 speaker.say(if (ok) "${prefs.familyFirstName} už to má." else "Zprávu rodině se nepodařilo odeslat. Zkontrolujte, jestli má telefon signál a kredit.")
             }
         })
@@ -524,7 +524,7 @@ class LetterActivity : Activity() {
         }
         sending = true; sendFailed = false; spoken = null
         render()
-        Family.sms(this, s.familyText) { ok ->
+        Family.sms(this, s.familyText, maxParts = 2) { ok ->
             sending = false
             if (ok) {
                 sentToFamily = true

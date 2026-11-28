@@ -46,14 +46,14 @@ class SmsReceiver : BroadcastReceiver() {
                 Notify.show(context, notifId, Notify.CH_WARN, "⚠️ Pozor, podvod",
                     "Od: $address. Na nic neklikejte a nic neplaťte. ${prefs.familyName} už o tom ví.", open, Color.RED)
                 Family.notify(context, "${prefs.seniorName}: podvodná SMS",
-                    "Od: $address\n${result.reason}\nOdkaz je zablokovaný.\n\nText: ${body.take(300)}",
+                    "Od $address: ${body.take(300)}",
                     reviewKey = key)
             }
             ScamCheck.Level.WARN -> {
                 Notify.show(context, notifId, Notify.CH_WARN, "⚠️ Podezřelá zpráva",
                     "Od: $address. Zatím nic nedělejte, ptáme se: ${prefs.familyName}.", open, Color.rgb(0xA8, 0x5D, 0x00))
-                Family.notify(context, "${prefs.seniorName}: podezřelá SMS, je v pořádku?",
-                    "Od: $address\n${result.reason}\n\nText: ${body.take(300)}", urgent = false,
+                Family.notify(context, "${prefs.seniorName}: podezřelá SMS",
+                    "Od $address: ${body.take(300)}", urgent = false,
                     reviewKey = key)
             }
             ScamCheck.Level.OK -> {

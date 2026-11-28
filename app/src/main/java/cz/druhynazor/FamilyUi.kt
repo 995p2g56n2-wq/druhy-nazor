@@ -23,6 +23,8 @@ object FamilyUi {
         "Postaráno: Dobrý den, od teď vám napíšu, když na telefon ${prefs.seniorGenitive} přijde podvod " +
         "nebo něco podezřelého. U nejasné zprávy stačí odpovědět ANO, nebo NE. Nic nemusíte instalovat."
 
+    private fun sentWord(n: Int) = when (n) { 1 -> "odešla"; 2, 3, 4 -> "odešly"; else -> "odešlo" }
+
     private fun canSms(a: Activity) = a.checkSelfPermission(android.Manifest.permission.SEND_SMS) ==
         android.content.pm.PackageManager.PERMISSION_GRANTED
 
@@ -58,6 +60,10 @@ object FamilyUi {
         card.addView(Ui.text(a,
             "Když přijde podezřelá zpráva, tito lidé dostanou SMS a odpoví ANO, nebo NE. Nic nemusí instalovat.",
             17f, color = Ui.MUTED))
+        // Každá SMS rodině stojí kredit na SIM seniora. Ať je vidět, kolik jich odešlo.
+        val sent = Family.sentThisMonth(a)
+        card.addView(Ui.text(a, "Tento měsíc ${sentWord(sent)} rodině $sent SMS. Každá stojí kredit.",
+            16f, color = if (sent > 50) Ui.WARN else Ui.MUTED, bold = sent > 50))
 
         val list = prefs.familyContacts
         if (list.isEmpty()) card.addView(Ui.text(a, "Zatím nikdo.", 18f, color = Ui.WARN, bold = true))
@@ -116,7 +122,7 @@ object FamilyUi {
         prefs.familyContacts = prefs.familyContacts + FamilyContact(name, phone)
         // Po dokončeném nastavení dostane nový člověk hned vysvětlení. Při prvním nastavení
         // odejde až na konci, až aplikace smí posílat SMS.
-        if (prefs.testSent && canSms(a)) Family.sendSms(a, phone, welcomeText(prefs))
+        if (prefs.testSent && canSms(a)) Family.sendSms(a, phone, welcomeText(prefs), maxParts = 2)
     }
 
     /** Výsledek z výběru kontaktu. Vrací true, když šlo o něj. */
